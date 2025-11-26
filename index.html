@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>線上聲音實驗室 Online Sound Lab v3.5</title>
+    <title>線上聲音實驗室 Online Sound Lab v6.3</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/lucide@latest"></script>
     <style>
@@ -13,641 +13,608 @@
         canvas { touch-action: none; }
         input[type=range] { accent-color: #3b82f6; cursor: pointer; }
         
-        /* Custom scrollbar */
         ::-webkit-scrollbar { width: 6px; }
         ::-webkit-scrollbar-track { background: #1e293b; }
         ::-webkit-scrollbar-thumb { background: #475569; border-radius: 3px; }
 
-        /* Recorder Styles */
-        .recorder-body {
-            background: linear-gradient(90deg, #fdfbf7 0%, #f3e5ab 50%, #e6dba0 100%);
-            box-shadow: 2px 0 10px rgba(0,0,0,0.3);
-        }
-        .recorder-hole-base {
-            background-color: #3d342b; /* Open */
-            box-shadow: inset 1px 1px 2px rgba(0,0,0,0.8);
-            cursor: pointer;
-            transition: all 0.1s;
-            border: 1px solid #d1c496;
-            position: relative;
-        }
-        .recorder-hole-base.closed::after {
-            content: ''; position: absolute; inset: -3px;
-            background: radial-gradient(circle, #fecaca 30%, #f87171 100%);
-            border-radius: 50%; opacity: 0.9;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.3); border: 1px solid #ef4444;
-        }
-        .recorder-hole { width: 18px; height: 18px; border-radius: 50%; }
-        .double-hole-container { display: flex; gap: 4px; transform: rotate(-15deg); cursor: pointer; }
-        .recorder-hole-small { width: 12px; height: 12px; border-radius: 50%; }
-        .recorder-hole-tiny { width: 9px; height: 9px; border-radius: 50%; }
-        
-        .air-column-bar { transition: height 0.2s cubic-bezier(0.25, 1, 0.5, 1); }
+        /* Recorder & Instrument Styles */
+        .recorder-body { background: linear-gradient(90deg, #fdfbf7 0%, #f3e5ab 50%, #e6dba0 100%); box-shadow: 2px 0 15px rgba(0,0,0,0.4); }
+        .recorder-hole-base { background-color: #3d342b; box-shadow: inset 1px 1px 3px rgba(0,0,0,0.9); cursor: pointer; transition: all 0.1s; border: 1px solid #d1c496; position: relative; }
+        .recorder-hole-base.closed::after { content: ''; position: absolute; inset: -4px; background: radial-gradient(circle, #fecaca 30%, #f87171 100%); border-radius: 50%; opacity: 0.9; box-shadow: 0 2px 4px rgba(0,0,0,0.3); border: 1px solid #ef4444; }
+        .recorder-hole { width: 20px; height: 20px; border-radius: 50%; }
+        .double-hole-container { display: flex; gap: 2px; transform: rotate(-15deg); cursor: pointer; justify-content: center; }
+        .recorder-hole-small { width: 14px; height: 14px; border-radius: 50%; }
+        .recorder-hole-tiny { width: 10px; height: 10px; border-radius: 50%; }
+        .recorder-back-hole { border: 2px dashed #a16207; } 
+        .blowing-active { animation: breath 2s infinite ease-in-out; box-shadow: 0 0 15px #3b82f6; border-color: #3b82f6 !important; }
+        @keyframes breath { 0%, 100% { background-color: #bfdbfe; } 50% { background-color: #60a5fa; } }
+
+        .air-column-bar { transition: height 0.3s cubic-bezier(0.34, 1.56, 0.64, 1); }
         .peg-hit-area { transition: transform 0.1s; }
         .peg-hit-area:active { transform: scale(0.95); }
+        
+        .piano-key { transition: background-color 0.1s, transform 0.05s; border-bottom-left-radius: 4px; border-bottom-right-radius: 4px; }
+        .piano-key:active { transform: translateY(2px); }
+        .white-key { background: linear-gradient(to bottom, #fff 0%, #eee 100%); height: 180px; z-index: 1; }
+        .white-key:active { background: #ddd; }
+        .black-key { background: linear-gradient(to bottom, #333 0%, #000 100%); height: 110px; z-index: 2; position: absolute; top: 0; width: 6%; margin-left: -3%; }
+        .black-key:active { background: #222; }
+        
+        .tuner-needle { transition: transform 0.2s cubic-bezier(0.1, 0.7, 1.0, 0.1); transform-origin: bottom center; }
+        .db-bar-container { background: #1e293b; border-radius: 999px; overflow: hidden; position: relative; box-shadow: inset 0 2px 4px rgba(0,0,0,0.5); }
+        .db-bar-fill { background: linear-gradient(to top, #22c55e 0%, #eab308 60%, #ef4444 100%); width: 100%; position: absolute; bottom: 0; transition: height 0.1s linear; }
+        .db-marker { position: absolute; right: 0; width: 10px; border-top: 1px solid #64748b; text-align: right; font-size: 10px; color: #94a3b8; padding-right: 12px; }
+        
+        .data-highlight { text-shadow: 0 0 15px rgba(59, 130, 246, 0.6); }
+        .success-pulse { animation: success-pulse 0.5s ease-in-out; }
+        @keyframes success-pulse { 0% { transform: scale(1); } 50% { transform: scale(1.1); box-shadow: 0 0 30px #22c55e; } 100% { transform: scale(1); } }
+        .life-btn:disabled { opacity: 0.5; cursor: not-allowed; filter: grayscale(0.8); }
+
+        /* Metronome Animation */
+        @keyframes metro-flash { 0% { background-color: #ef4444; box-shadow: 0 0 20px #ef4444; } 100% { background-color: #334155; box-shadow: none; } }
+        .beat-flash { animation: metro-flash 0.1s ease-out forwards; }
     </style>
 </head>
 <body class="bg-slate-900 text-slate-100 h-screen flex flex-col overflow-hidden select-none">
 
     <!-- Header -->
-    <header class="bg-slate-800 border-b border-slate-700 p-4 flex items-center justify-between shrink-0 z-20 shadow-md">
-        <div class="flex items-center gap-3">
+    <header class="bg-slate-800 border-b border-slate-700 p-3 flex items-center justify-between shrink-0 z-20 shadow-md gap-4">
+        <div class="flex items-center gap-3 shrink-0">
             <i data-lucide="waves" class="w-8 h-8 text-blue-400"></i>
-            <h1 class="text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-teal-400">
-                線上聲音實驗室 v3.5 
+            <h1 class="text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-teal-400 hidden sm:block">
+                線上聲音實驗室 v6.3
                 <span class="text-sm text-slate-500 ml-2 font-medium">by 小萬</span>
             </h1>
+            <h1 class="text-xl font-bold text-blue-400 sm:hidden">聲音實驗室</h1>
         </div>
-        <div class="text-xs text-slate-400 hidden md:block">Web Audio API & Canvas Physics Engine</div>
+        
+        <!-- Return Button (Flattened & Integrated) -->
+        <a href="https://sites.google.com/view/cutedavid/%E9%A6%96%E9%A0%81" class="text-slate-400 hover:text-white hover:bg-slate-700/50 px-3 py-2 rounded transition-all text-sm font-medium flex items-center gap-2 shrink-0 group">
+            <i data-lucide="arrow-left-circle" class="w-4 h-4 group-hover:-translate-x-1 transition-transform"></i>
+            <span>返回萬老師實驗室</span>
+        </a>
+        
+        <div class="text-xs text-slate-400 hidden lg:block ml-auto">Web Audio API Physics Engine</div>
     </header>
 
     <div class="flex flex-1 overflow-hidden relative">
-        <!-- Sidebar Navigation -->
-        <nav class="w-20 md:w-64 bg-slate-800 border-r border-slate-700 flex flex-col shrink-0 overflow-y-auto z-10">
-            <button onclick="switchTab('wave-gen')" class="tab-btn active p-4 text-left hover:bg-slate-700 transition flex items-center gap-3 border-b border-slate-700" id="btn-wave-gen">
-                <i data-lucide="activity" class="w-6 h-6"></i>
-                <div class="hidden md:block">
-                    <span class="block font-bold">波形與頻率</span>
-                    <span class="text-xs opacity-70">示波器 & 產生器</span>
-                </div>
-            </button>
-            <button onclick="switchTab('medium')" class="tab-btn p-4 text-left hover:bg-slate-700 transition flex items-center gap-3 border-b border-slate-700" id="btn-medium">
-                <i data-lucide="wind" class="w-6 h-6"></i>
-                <div class="hidden md:block">
-                    <span class="block font-bold">聲速與介質</span>
-                    <span class="text-xs opacity-70">溫度與狀態影響</span>
-                </div>
-            </button>
-            <button onclick="switchTab('doppler')" class="tab-btn p-4 text-left hover:bg-slate-700 transition flex items-center gap-3 border-b border-slate-700" id="btn-doppler">
-                <i data-lucide="car" class="w-6 h-6"></i>
-                <div class="hidden md:block">
-                    <span class="block font-bold">都卜勒效應</span>
-                    <span class="text-xs opacity-70">移動聲源模擬</span>
-                </div>
-            </button>
-            <button onclick="switchTab('violin')" class="tab-btn p-4 text-left hover:bg-slate-700 transition flex items-center gap-3 border-b border-slate-700" id="btn-violin">
-                <i data-lucide="music" class="w-6 h-6"></i>
-                <div class="hidden md:block">
-                    <span class="block font-bold">弦樂實驗 (小提琴)</span>
-                    <span class="text-xs opacity-70">弦長與張力</span>
-                </div>
-            </button>
-             <button onclick="switchTab('wind')" class="tab-btn p-4 text-left hover:bg-slate-700 transition flex items-center gap-3 border-b border-slate-700" id="btn-wind">
-                <i data-lucide="mic-2" class="w-6 h-6"></i>
-                <div class="hidden md:block">
-                    <span class="block font-bold">管樂實驗 (直笛)</span>
-                    <span class="text-xs opacity-70">空氣柱與音高</span>
-                </div>
-            </button>
+        <!-- Sidebar -->
+        <nav class="w-20 md:w-64 bg-slate-800 border-r border-slate-700 flex flex-col shrink-0 overflow-y-auto z-10 pb-20">
+            <div class="px-4 py-2 text-xs font-bold text-slate-500 uppercase tracking-wider mt-2">基礎實驗</div>
+            <button onclick="switchTab('wave-gen')" class="tab-btn active p-3 text-left hover:bg-slate-700 transition flex items-center gap-3 border-b border-slate-700/50" id="btn-wave-gen"><i data-lucide="activity" class="w-5 h-5"></i><span class="hidden md:block text-sm">波形與頻率</span></button>
+            <button onclick="switchTab('loudness')" class="tab-btn p-3 text-left hover:bg-slate-700 transition flex items-center gap-3 border-b border-slate-700/50" id="btn-loudness"><i data-lucide="megaphone" class="w-5 h-5"></i><span class="hidden md:block text-sm">大聲公測試</span></button>
+            <button onclick="switchTab('medium')" class="tab-btn p-3 text-left hover:bg-slate-700 transition flex items-center gap-3 border-b border-slate-700/50" id="btn-medium"><i data-lucide="wind" class="w-5 h-5"></i><span class="hidden md:block text-sm">聲速與介質</span></button>
+            <button onclick="switchTab('doppler')" class="tab-btn p-3 text-left hover:bg-slate-700 transition flex items-center gap-3 border-b border-slate-700/50" id="btn-doppler"><i data-lucide="car" class="w-5 h-5"></i><span class="hidden md:block text-sm">都卜勒效應</span></button>
+            <button onclick="switchTab('metronome')" class="tab-btn p-3 text-left hover:bg-slate-700 transition flex items-center gap-3 border-b border-slate-700/50" id="btn-metronome"><i data-lucide="clock" class="w-5 h-5"></i><span class="hidden md:block text-sm">節拍大師</span></button>
+            
+            <div class="px-4 py-2 text-xs font-bold text-slate-500 uppercase tracking-wider mt-4">樂器與原理</div>
+            <button onclick="switchTab('violin')" class="tab-btn p-3 text-left hover:bg-slate-700 transition flex items-center gap-3 border-b border-slate-700/50" id="btn-violin"><i data-lucide="music" class="w-5 h-5"></i><span class="hidden md:block text-sm">弦樂 (小提琴)</span></button>
+            <button onclick="switchTab('wind')" class="tab-btn p-3 text-left hover:bg-slate-700 transition flex items-center gap-3 border-b border-slate-700/50" id="btn-wind"><i data-lucide="mic-2" class="w-5 h-5"></i><span class="hidden md:block text-sm">管樂 (直笛)</span></button>
+            <button onclick="switchTab('beats')" class="tab-btn p-3 text-left hover:bg-slate-700 transition flex items-center gap-3 border-b border-slate-700/50" id="btn-beats"><i data-lucide="rss" class="w-5 h-5"></i><span class="hidden md:block text-sm">拍音實驗室</span></button>
+
+            <div class="px-4 py-2 text-xs font-bold text-slate-500 uppercase tracking-wider mt-4">生活與應用</div>
+            <button onclick="switchTab('life')" class="tab-btn p-3 text-left hover:bg-slate-700 transition flex items-center gap-3 border-b border-slate-700/50" id="btn-life"><i data-lucide="coffee" class="w-5 h-5"></i><span class="hidden md:block text-sm">生活中的聲音</span></button>
+            <button onclick="switchTab('pitch-expert')" class="tab-btn p-3 text-left hover:bg-slate-700 transition flex items-center gap-3 border-b border-slate-700/50" id="btn-pitch-expert"><i data-lucide="graduation-cap" class="w-5 h-5"></i><span class="hidden md:block text-sm">音高專家</span></button>
+            <button onclick="switchTab('pitch-coach')" class="tab-btn p-3 text-left hover:bg-slate-700 transition flex items-center gap-3 border-b border-slate-700/50" id="btn-pitch-coach"><i data-lucide="mic-2" class="w-5 h-5"></i><span class="hidden md:block text-sm">音準教練 (遊戲)</span></button>
+            
+            <div class="mt-auto p-4">
+                <button onclick="toggleModal('info-history')" class="w-full bg-slate-800 hover:bg-slate-700 text-slate-400 text-xs py-2 rounded border border-slate-600 flex items-center justify-center gap-2 transition">
+                    <i data-lucide="history" class="w-3 h-3"></i> 版本紀錄
+                </button>
+            </div>
         </nav>
 
-        <!-- Main Content Area -->
+        <!-- Main Content -->
         <main class="flex-1 bg-slate-900 relative overflow-hidden flex flex-col">
-            
-            <!-- Tab 1: Wave & Frequency Generator -->
+            <div id="info-history" class="hidden fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4" onclick="toggleModal('info-history')">
+                <div class="bg-slate-800 p-6 rounded-xl max-w-lg w-full border border-slate-600 shadow-2xl max-h-[80vh] overflow-y-auto" onclick="event.stopPropagation()">
+                    <div class="flex justify-between items-center mb-6 border-b border-slate-600 pb-4"><h3 class="font-bold text-xl text-white flex items-center gap-2"><i data-lucide="history" class="text-blue-400"></i> 版本更新紀錄</h3><button onclick="toggleModal('info-history')"><i data-lucide="x" class="text-slate-400 hover:text-white"></i></button></div>
+                    <div class="space-y-6 text-sm text-slate-300">
+                        <div><h4 class="text-blue-400 font-bold text-lg">v6.3 (Current)</h4><ul class="list-disc list-inside pl-2 mt-1 space-y-1 text-slate-400"><li>優化：波形實驗室「播放/暫停」功能整合，暫停時可凍結波形觀察。</li><li>優化：頂部返回按鈕扁平化設計。</li></ul></div>
+                        <div><h4 class="text-slate-500 font-bold">v6.1 - v6.2</h4><ul class="list-disc list-inside pl-2 mt-1 text-slate-600"><li>新增：節拍大師 (Metronome)。</li><li>修復：拍音實驗室錯誤。</li></ul></div>
+                        <div><h4 class="text-slate-500 font-bold">v6.0</h4><ul class="list-disc list-inside pl-2 mt-1 text-slate-600"><li>新增：更多古典樂。</li><li>優化：生活聲音播放鎖定。</li></ul></div>
+                        <div><h4 class="text-slate-500 font-bold">v5.0 - v5.9</h4><ul class="list-disc list-inside pl-2 mt-1 text-slate-600"><li>新增：古典樂廳、音準教練、拍音實驗室、音高專家。</li><li>優化：物理模型與顯示介面。</li></ul></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tab 1: Wave & Frequency (UPDATED CONTROLS) -->
             <div id="tab-wave-gen" class="tab-content h-full flex flex-col p-4">
                 <div class="flex justify-between items-start mb-4">
                     <div class="flex items-center gap-4">
                         <h2 class="text-2xl font-bold flex items-center gap-2">波形與頻率實驗</h2>
-                        <button onclick="toggleModal('info-wave')" class="bg-slate-700 hover:bg-slate-600 px-3 py-1 rounded text-sm text-white flex items-center gap-1 border border-slate-600 transition">
-                            <i data-lucide="book-open" class="w-4 h-4"></i> 使用說明
-                        </button>
+                        <button onclick="toggleModal('info-wave')" class="bg-slate-700 hover:bg-slate-600 px-3 py-1 rounded text-sm text-white flex items-center gap-1 border border-slate-600"><i data-lucide="book-open" class="w-4 h-4"></i> 使用說明</button>
                     </div>
-                    <div class="flex gap-2">
-                        <button onclick="toggleOscillator()" id="osc-toggle-btn" class="bg-blue-600 hover:bg-blue-500 px-4 py-2 rounded flex items-center gap-2 font-bold shadow-lg shadow-blue-900/50 transition-colors">
-                            <i data-lucide="play"></i> 播放聲音
+                    <div class="flex gap-3">
+                        <!-- Combined Play/Pause Button -->
+                        <button onclick="toggleOscillator()" id="osc-toggle-btn" class="bg-blue-600 hover:bg-blue-500 px-4 py-2 rounded-lg font-bold shadow-lg flex items-center gap-2 text-sm transition-all hover:scale-105 active:scale-95">
+                            <i data-lucide="play"></i> 播放聲音 (Play)
                         </button>
-                         <button onclick="togglePauseOsc()" id="btn-pause-osc" class="bg-slate-700 hover:bg-slate-600 px-4 py-2 rounded flex items-center gap-2 border border-slate-600" title="暫停波形畫面">
-                            <i data-lucide="pause"></i> 暫停畫面
-                        </button>
-                        <button onclick="toggleMic()" id="mic-toggle-btn" class="bg-slate-700 hover:bg-slate-600 px-4 py-2 rounded flex items-center gap-2 border border-slate-600 ml-2 transition-colors">
-                            <i data-lucide="mic"></i> 麥克風
-                        </button>
-                    </div>
-                </div>
-                
-                <!-- Info Modal -->
-                <div id="info-wave" class="hidden fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" onclick="toggleModal('info-wave')">
-                    <div class="bg-slate-800 p-6 rounded-lg max-w-md w-full border border-slate-600 shadow-2xl" onclick="event.stopPropagation()">
-                        <div class="flex justify-between items-center mb-4"><h3 class="font-bold text-xl text-white">使用說明</h3><button onclick="toggleModal('info-wave')"><i data-lucide="x"></i></button></div>
-                        <ul class="list-disc list-inside space-y-2 text-slate-300 text-sm">
-                            <li><strong>播放聲音：</strong> 產生標準頻率聲音。</li>
-                            <li><strong>麥克風偵測：</strong> 按下麥克風按鈕，對著裝置說話或唱歌，右側面板會顯示偵測到的音高。</li>
-                            <li><strong>頻率 (Hz)：</strong> 聲音振動的快慢。</li>
-                            <li><strong>波形：</strong> 聲音的形狀。</li>
-                        </ul>
+                        
+                        <div class="flex items-center bg-slate-800 rounded-lg border border-slate-600 p-1 ml-2">
+                            <button onclick="toggleMic()" id="mic-toggle-btn" class="bg-slate-700 hover:bg-slate-600 px-3 py-1.5 rounded flex items-center gap-2 text-sm transition-colors">
+                                <i data-lucide="mic"></i> 麥克風
+                            </button>
+                            <div class="w-px h-6 bg-slate-600 mx-1"></div>
+                            <button onclick="toggleMicMonitor()" id="mic-monitor-btn" class="text-slate-400 hover:text-white p-1.5 rounded transition-colors" title="監聽 (需戴耳機)">
+                                <i data-lucide="volume-x"></i>
+                            </button>
+                        </div>
                     </div>
                 </div>
-
+                <div id="info-wave" class="hidden fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" onclick="toggleModal('info-wave')"><div class="bg-slate-800 p-6 rounded-lg max-w-md w-full border border-slate-600 shadow-2xl" onclick="event.stopPropagation()"><div class="flex justify-between mb-4"><h3 class="font-bold text-xl">使用說明</h3><button onclick="toggleModal('info-wave')"><i data-lucide="x"></i></button></div><ul class="list-disc pl-5 text-slate-300 text-sm"><li>播放聲音：產生標準頻率，點擊暫停可凍結波形。</li><li>麥克風：偵測音高。</li><li>頻率：振動快慢。</li></ul></div></div>
                 <div class="flex-1 flex flex-col lg:flex-row gap-4 overflow-hidden">
-                    <!-- Oscilloscope View -->
-                    <div class="flex-1 flex flex-col gap-2 relative group">
-                        <div class="flex-1 bg-black rounded-lg border border-slate-700 relative overflow-hidden shadow-inner">
-                            <canvas id="canvas-oscilloscope" class="w-full h-full"></canvas>
-                            <div class="absolute inset-0 pointer-events-none opacity-20" style="background-image: linear-gradient(#333 1px, transparent 1px), linear-gradient(90deg, #333 1px, transparent 1px); background-size: 40px 40px;"></div>
-                            <div class="absolute inset-0 pointer-events-none border-t border-slate-800" style="top:50%"></div>
-                            <div class="absolute top-4 right-4 text-green-400 font-mono text-xs bg-black/70 p-2 rounded backdrop-blur-sm border border-green-900/50"><div>RMS: <span id="osc-rms-val">0.00</span></div></div>
-                        </div>
-                    </div>
-                    
-                    <!-- Controls & Detection Panel -->
-                    <div class="lg:w-80 bg-slate-800 p-5 rounded-lg border border-slate-700 overflow-y-auto flex flex-col gap-6">
-                        
-                        <!-- Pitch Detection Display (New Feature) -->
-                        <div class="bg-slate-900 rounded-xl p-4 border-2 border-indigo-500/30 shadow-lg relative overflow-hidden">
-                            <div class="absolute top-0 left-0 w-1 h-full bg-indigo-500"></div>
-                            <h3 class="text-indigo-400 font-bold text-sm mb-2 flex items-center gap-2">
-                                <i data-lucide="mic-2" class="w-4 h-4"></i> 麥克風音高偵測
-                            </h3>
-                            
-                            <!-- Detection Status -->
-                            <div id="pitch-detect-panel">
-                                <div class="text-center py-2">
-                                    <div class="text-xs text-slate-500 mb-1">偵測頻率</div>
-                                    <div class="text-4xl font-black text-white font-mono tracking-tight" id="detect-hz">-- Hz</div>
-                                </div>
-                                <div class="flex justify-center gap-4 mt-2 border-t border-slate-800 pt-2">
-                                    <div class="text-center">
-                                        <div class="text-[10px] text-slate-500">音名</div>
-                                        <div class="text-xl font-bold text-indigo-300" id="detect-note">--</div>
-                                    </div>
-                                    <div class="text-center">
-                                        <div class="text-[10px] text-slate-500">唱名</div>
-                                        <div class="text-xl font-bold text-indigo-300" id="detect-solfege">--</div>
-                                    </div>
-                                </div>
-                                <div id="detect-msg" class="text-center text-xs text-slate-500 mt-2">
-                                    (請開啟麥克風以開始偵測)
-                                </div>
-                            </div>
-                        </div>
-
-                        <div id="high-freq-warning" class="hidden bg-yellow-900/40 border border-yellow-500/50 p-3 rounded text-yellow-200 text-xs flex items-start gap-2 animate-pulse">
-                            <i data-lucide="ear-off" class="w-5 h-5 shrink-0"></i><div><strong>高頻警告</strong><br>頻率極高 (>2000Hz) 可能造成不適。</div>
-                        </div>
-
-                        <!-- Standard Controls -->
-                        <div>
-                            <label class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2 block">產生器波形</label>
-                            <div class="grid grid-cols-4 gap-2">
-                                <button onclick="setWaveType('sine')" class="wave-btn active bg-slate-700 hover:bg-blue-600 p-2 rounded flex justify-center border border-slate-600 transition" data-type="sine"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 12s4-6 10-6 10 6 10 6"/></svg></button>
-                                <button onclick="setWaveType('square')" class="wave-btn bg-slate-700 hover:bg-blue-600 p-2 rounded flex justify-center border border-slate-600 transition" data-type="square"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 12h5v-6h5v12h5v-6h5"/></svg></button>
-                                <button onclick="setWaveType('sawtooth')" class="wave-btn bg-slate-700 hover:bg-blue-600 p-2 rounded flex justify-center border border-slate-600 transition" data-type="sawtooth"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 12l10-6v12l10-6"/></svg></button>
-                                <button onclick="setWaveType('triangle')" class="wave-btn bg-slate-700 hover:bg-blue-600 p-2 rounded flex justify-center border border-slate-600 transition" data-type="triangle"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 12l5-6 5 6 5-6 5 6"/></svg></button>
-                            </div>
-                        </div>
-                        <div class="bg-slate-700/50 p-3 rounded-lg border border-slate-600">
-                            <label class="flex justify-between text-sm mb-2"><span class="text-slate-300">產生頻率 (Hz)</span><span class="font-mono text-blue-400 font-bold"><input type="number" id="osc-freq-input" value="440" class="bg-transparent text-right w-20 focus:outline-none border-b border-blue-500/50" onchange="updateOscillatorFromInput()"> Hz</span></label>
-                            <input type="range" id="osc-freq" min="20" max="5000" value="440" class="w-full h-2 bg-slate-600 rounded-lg appearance-none cursor-pointer mb-4" oninput="updateOscillator()">
-                            <div class="grid grid-cols-5 gap-1">
-                                <button onclick="setFreq(261.6)" class="text-[10px] bg-slate-600 px-1 py-1 rounded hover:bg-slate-500">C4</button>
-                                <button onclick="setFreq(440)" class="text-[10px] bg-slate-600 px-1 py-1 rounded hover:bg-slate-500">A4</button>
-                                <button onclick="setFreq(1000)" class="text-[10px] bg-slate-600 px-1 py-1 rounded hover:bg-slate-500">1k</button>
-                                <button onclick="setFreq(2500)" class="text-[10px] bg-slate-600 px-1 py-1 rounded hover:bg-slate-500">2.5k</button>
-                                <button onclick="setFreq(5000)" class="text-[10px] bg-slate-600 px-1 py-1 rounded hover:bg-slate-500">5k</button>
-                            </div>
-                        </div>
-                        <div class="bg-slate-700/50 p-3 rounded-lg border border-slate-600">
-                            <label class="flex justify-between text-sm mb-2"><span class="text-slate-300">產生音量</span><span class="font-mono text-blue-400 font-bold" id="osc-vol-val">50%</span></label>
-                            <input type="range" id="osc-vol" min="0" max="1" step="0.01" value="0.2" class="w-full h-2 bg-slate-600 rounded-lg appearance-none cursor-pointer" oninput="updateOscillator()">
-                        </div>
+                    <div class="flex-1 bg-black rounded-lg border border-slate-700 relative overflow-hidden"><canvas id="canvas-oscilloscope" class="w-full h-full"></canvas></div>
+                    <div class="lg:w-80 bg-slate-800 p-4 rounded-lg border border-slate-700 overflow-y-auto flex flex-col gap-4">
+                        <div class="bg-slate-900 rounded-xl p-4 border-2 border-indigo-500/50 shadow-lg"><h3 class="text-indigo-400 font-bold text-sm mb-3 flex items-center gap-2"><i data-lucide="mic"></i> 即時音高偵測</h3><div class="text-center"><div class="text-xs text-slate-500 mb-1 uppercase tracking-widest">Frequency</div><div class="text-5xl font-black text-white font-mono data-highlight mb-2" id="detect-hz">-- Hz</div><div class="flex justify-center gap-6 mt-2 border-t border-slate-700 pt-3"><div><div class="text-xs text-slate-500">音名</div><div class="text-3xl font-bold text-indigo-300" id="detect-note">--</div></div><div><div class="text-xs text-slate-500">唱名</div><div class="text-3xl font-bold text-indigo-300" id="detect-solfege">--</div></div></div><div id="detect-msg" class="text-xs text-slate-500 mt-2">(請開啟麥克風)</div></div><div class="mt-4 pt-4 border-t border-slate-800"><div class="flex justify-between text-[10px] text-slate-400 mb-1"><span>噪音過濾門檻</span><span id="wave-gate-val">30 dB</span></div><input type="range" id="wave-noise-gate" min="0" max="80" value="30" class="w-full h-1 bg-slate-700 rounded appearance-none" oninput="updateWaveGate(this.value)"></div></div>
+                        <div id="high-freq-warning" class="hidden bg-yellow-900/40 border border-yellow-500/50 p-2 rounded text-yellow-200 text-xs">高頻警告 (>2000Hz)</div>
+                        <div class="grid grid-cols-4 gap-1"><button onclick="setWaveType('sine')" class="wave-btn active bg-slate-700 p-1 rounded flex justify-center" data-type="sine"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 12s4-6 10-6 10 6 10 6"/></svg></button><button onclick="setWaveType('square')" class="wave-btn bg-slate-700 p-1 rounded flex justify-center" data-type="square"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 12h5v-6h5v12h5v-6h5"/></svg></button><button onclick="setWaveType('sawtooth')" class="wave-btn bg-slate-700 p-1 rounded flex justify-center" data-type="sawtooth"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 12l10-6v12l10-6"/></svg></button><button onclick="setWaveType('triangle')" class="wave-btn bg-slate-700 p-1 rounded flex justify-center" data-type="triangle"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 12l5-6 5 6 5-6 5 6"/></svg></button></div>
+                        <div class="bg-slate-700/50 p-2 rounded"><label class="flex justify-between text-xs mb-1"><span class="text-slate-300">產生頻率</span><input type="number" id="osc-freq-input" value="440" class="bg-transparent text-right w-16 text-blue-400 font-bold" onchange="updateOscillatorFromInput()"></label><input type="range" id="osc-freq" min="20" max="5000" value="440" class="w-full h-1 bg-slate-600 rounded appearance-none" oninput="updateOscillator()"></div>
+                        <div class="bg-slate-700/50 p-2 rounded"><label class="flex justify-between text-xs mb-1"><span class="text-slate-300">音量</span><span class="font-mono text-blue-400 font-bold" id="osc-vol-val">50%</span></label><input type="range" id="osc-vol" min="0" max="1" step="0.01" value="0.5" class="w-full h-1 bg-slate-600 rounded appearance-none" oninput="updateOscillator()"></div>
                     </div>
                 </div>
             </div>
 
-            <!-- Tab 2: Speed of Sound (Unchanged) -->
-            <div id="tab-medium" class="tab-content hidden h-full flex flex-col p-4 overflow-y-auto">
-                <div class="flex justify-between items-center mb-4">
-                    <h2 class="text-2xl font-bold">聲速與介質實驗</h2>
-                    <button onclick="triggerPulse()" class="bg-blue-600 hover:bg-blue-500 px-6 py-2 rounded font-bold shadow-lg shadow-blue-500/30 flex items-center gap-2 active:scale-95 transition">
-                        <i data-lucide="zap"></i> 發送脈衝
-                    </button>
-                </div>
-                <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">
-                    <div class="bg-slate-800 p-4 rounded-lg border border-slate-700 flex flex-col justify-center">
-                        <h3 class="font-bold text-slate-300 mb-2 flex items-center gap-2"><i data-lucide="book-open" class="w-4 h-4"></i> 聲速原理</h3>
-                        <p class="text-sm text-slate-400 leading-relaxed">溫度越高，粒子運動越快，聲音傳播越快。固體密度高，傳導最快。</p>
-                    </div>
-                    <div class="bg-slate-800 p-4 rounded-lg border border-slate-700 flex flex-col justify-center">
-                         <div class="flex items-center gap-3 mb-4"><i data-lucide="thermometer" class="text-red-400"></i><span class="font-bold">環境溫度：</span><span class="font-mono text-2xl text-red-400" id="temp-display">20°C</span></div>
-                        <input type="range" id="temp-slider" min="-20" max="100" value="20" class="w-full h-2 bg-slate-600 rounded-lg appearance-none cursor-pointer accent-red-500 mb-2" oninput="updateTemperature()">
-                    </div>
-                </div>
-                <div class="grid grid-rows-3 gap-4 flex-1 min-h-[500px]">
-                    <div class="medium-card bg-slate-800 rounded-lg p-4 relative overflow-hidden border-l-4 border-purple-500 flex flex-col">
-                        <div class="flex justify-between items-center z-10 mb-2"><h3 class="font-bold text-purple-400">固體 (鋼鐵)</h3><div class="text-xs bg-slate-900 px-2 py-1 rounded">速度: <span class="text-purple-300 font-mono text-lg" id="speed-solid">5000</span> m/s</div></div>
-                        <canvas id="canvas-solid" class="w-full flex-1 rounded bg-slate-900/50"></canvas>
-                    </div>
-                    <div class="medium-card bg-slate-800 rounded-lg p-4 relative overflow-hidden border-l-4 border-blue-500 flex flex-col">
-                        <div class="flex justify-between items-center z-10 mb-2"><h3 class="font-bold text-blue-400">液體 (水)</h3><div class="text-xs bg-slate-900 px-2 py-1 rounded">速度: <span class="text-blue-300 font-mono text-lg" id="speed-liquid">1482</span> m/s</div></div>
-                        <canvas id="canvas-liquid" class="w-full flex-1 rounded bg-slate-900/50"></canvas>
-                    </div>
-                    <div class="medium-card bg-slate-800 rounded-lg p-4 relative overflow-hidden border-l-4 border-green-500 flex flex-col">
-                        <div class="flex justify-between items-center z-10 mb-2"><h3 class="font-bold text-green-400">氣體 (空氣)</h3><div class="text-xs bg-slate-900 px-2 py-1 rounded">速度: <span class="text-green-300 font-mono text-lg" id="speed-gas">343</span> m/s</div></div>
-                        <canvas id="canvas-gas" class="w-full flex-1 rounded bg-slate-900/50"></canvas>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Tab 3: Doppler Effect -->
-            <div id="tab-doppler" class="tab-content hidden h-full flex flex-col p-4">
-                <div class="flex justify-between items-center mb-4">
-                    <div class="flex items-center gap-4">
-                        <h2 class="text-2xl font-bold flex items-center gap-2">都卜勒效應</h2>
-                        <button onclick="toggleModal('info-doppler')" class="bg-slate-700 hover:bg-slate-600 px-3 py-1 rounded text-sm text-white flex items-center gap-1 border border-slate-600 transition"><i data-lucide="book-open" class="w-4 h-4"></i> 使用說明</button>
-                    </div>
-                    <div class="flex gap-4 items-center bg-slate-800 p-2 rounded-lg border border-slate-700">
-                        <label class="flex items-center cursor-pointer gap-2 px-2 hover:bg-slate-700 rounded py-1 transition">
-                            <input type="checkbox" id="doppler-sound-toggle" class="w-4 h-4 accent-blue-500 rounded" onchange="toggleDopplerSound()">
-                            <span class="text-sm font-bold select-none">啟用音效</span>
-                        </label>
-                        <div class="w-px h-6 bg-slate-600"></div>
-                        <button onclick="resetDoppler()" class="text-sm bg-slate-700 hover:bg-slate-600 px-3 py-1 rounded text-white transition border border-slate-600">重置位置</button>
-                    </div>
-                </div>
-                <div id="info-doppler" class="hidden fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" onclick="toggleModal('info-doppler')">
-                    <div class="bg-slate-800 p-6 rounded-lg max-w-md w-full border border-slate-600 shadow-2xl" onclick="event.stopPropagation()">
-                        <div class="flex justify-between items-center mb-4"><h3 class="font-bold text-xl text-white">都卜勒效應說明</h3><button onclick="toggleModal('info-doppler')"><i data-lucide="x"></i></button></div>
-                        <ul class="list-disc list-inside space-y-2 text-slate-300 text-sm">
-                            <li><strong>操作：</strong> 拖曳畫面中的「藍點」移動聲源。</li>
-                            <li><strong>原理：</strong> 當聲源移動時，波的壓縮與拉伸會改變觀察者聽到的頻率。</li>
-                            <li><strong>接近時：</strong> 頻率變高 (音調上升)。</li>
-                            <li><strong>遠離時：</strong> 頻率變低 (音調下降)。</li>
-                        </ul>
-                    </div>
-                </div>
-                <div class="flex-1 bg-slate-800 rounded-lg relative overflow-hidden border border-slate-700 cursor-crosshair group shadow-inner" id="doppler-container">
-                    <canvas id="canvas-doppler" class="w-full h-full"></canvas>
-                    <div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-none flex flex-col items-center">
-                        <i data-lucide="ear" class="w-12 h-12 text-slate-300 drop-shadow-[0_0_10px_rgba(255,255,255,0.3)]"></i><span class="text-xs text-slate-400 mt-1 bg-black/50 px-2 rounded">觀察者</span>
-                    </div>
-                    <div class="absolute bottom-4 left-4 pointer-events-none">
-                        <div class="bg-black/80 p-4 rounded-lg border border-slate-600 backdrop-blur-sm">
-                            <div class="text-sm text-slate-300">觀測頻率: <span class="font-mono text-green-400 font-bold" id="doppler-obs-hz">440 Hz</span></div>
-                            <div class="text-xs text-slate-500 mt-1">請拖曳藍點移動</div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Tab 4: Violin Lab -->
-            <div id="tab-violin" class="tab-content hidden h-full flex flex-col p-4 bg-slate-900">
-                <div class="flex justify-between items-center mb-4">
-                    <h2 class="text-2xl font-bold flex items-center gap-2"><i data-lucide="music" class="text-amber-500"></i> 弦樂實驗 (小提琴)</h2>
-                    <button onclick="resetViolin()" class="bg-amber-700 hover:bg-amber-600 px-4 py-2 rounded flex items-center gap-2 text-sm border border-amber-600 transition">
-                        <i data-lucide="rotate-ccw"></i> 一鍵調音
-                    </button>
-                </div>
-                
-                <div class="flex-1 flex flex-col lg:flex-row gap-6 overflow-hidden">
-                    <div class="flex-1 bg-[#1a1510] rounded-xl border-4 border-[#3d2b1f] relative shadow-2xl overflow-hidden flex flex-col items-center py-6 select-none" id="violin-body">
-                        
-                        <!-- Direction Help Button -->
-                        <div class="absolute top-4 left-4 z-30 group">
-                            <div class="bg-black/60 p-2 rounded-full cursor-help border border-amber-800/50 hover:bg-black/80 transition shadow-lg">
-                                <i data-lucide="help-circle" class="w-6 h-6 text-amber-400"></i>
-                            </div>
-                            <!-- Tooltip -->
-                            <div class="absolute top-0 left-12 w-48 bg-black/90 p-3 rounded-lg border border-amber-600/50 backdrop-blur-md invisible opacity-0 group-hover:visible group-hover:opacity-100 transition-all duration-200 shadow-2xl pointer-events-none z-40">
-                                <h4 class="text-amber-400 font-bold text-sm mb-2 border-b border-amber-800 pb-1">調音操作指南</h4>
-                                <div class="space-y-2">
-                                    <div class="flex items-center gap-2 text-amber-200 text-xs">
-                                        <div class="bg-amber-900/50 p-1 rounded"><i data-lucide="move-vertical" class="w-4 h-4"></i></div>
-                                        <span>按住琴軸上下拖曳</span>
-                                    </div>
-                                    <div class="flex items-center gap-2 text-red-300 text-xs font-bold">
-                                        <i data-lucide="arrow-up" class="w-3 h-3"></i> 
-                                        <span>往上拉：轉緊 (音高↑)</span>
-                                    </div>
-                                    <div class="flex items-center gap-2 text-blue-300 text-xs font-bold">
-                                        <i data-lucide="arrow-down" class="w-3 h-3"></i> 
-                                        <span>往下拉：轉鬆 (音高↓)</span>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- Pegbox -->
-                        <div class="w-full max-w-lg flex justify-around mb-8 px-8 relative z-10">
-                            <div class="text-center group flex flex-col items-center"><div class="w-24 h-24 rounded-full bg-[#4e342e] border-4 border-[#3e2723] shadow-lg mb-2 cursor-ns-resize flex items-center justify-center hover:bg-[#5d4037] active:scale-95 transition peg-hit-area" onmousedown="startTuning(0)"><div class="w-3 h-14 bg-[#271c19] rounded rotate-45 pointer-events-none transform transition-transform" id="peg-0"></div></div><span class="text-xs text-amber-500/70 font-bold">G3 (粗)</span></div>
-                            <div class="text-center group flex flex-col items-center"><div class="w-24 h-24 rounded-full bg-[#4e342e] border-4 border-[#3e2723] shadow-lg mb-2 cursor-ns-resize flex items-center justify-center hover:bg-[#5d4037] active:scale-95 transition peg-hit-area" onmousedown="startTuning(1)"><div class="w-3 h-14 bg-[#271c19] rounded -rotate-45 pointer-events-none transform transition-transform" id="peg-1"></div></div><span class="text-xs text-amber-500/70 font-bold">D4</span></div>
-                            <div class="text-center group flex flex-col items-center"><div class="w-24 h-24 rounded-full bg-[#4e342e] border-4 border-[#3e2723] shadow-lg mb-2 cursor-ns-resize flex items-center justify-center hover:bg-[#5d4037] active:scale-95 transition peg-hit-area" onmousedown="startTuning(2)"><div class="w-3 h-14 bg-[#271c19] rounded rotate-45 pointer-events-none transform transition-transform" id="peg-2"></div></div><span class="text-xs text-amber-500/70 font-bold">A4</span></div>
-                            <div class="text-center group flex flex-col items-center"><div class="w-24 h-24 rounded-full bg-[#4e342e] border-4 border-[#3e2723] shadow-lg mb-2 cursor-ns-resize flex items-center justify-center hover:bg-[#5d4037] active:scale-95 transition peg-hit-area" onmousedown="startTuning(3)"><div class="w-3 h-14 bg-[#271c19] rounded -rotate-45 pointer-events-none transform transition-transform" id="peg-3"></div></div><span class="text-xs text-amber-500/70 font-bold">E5 (細)</span></div>
-                        </div>
-
-                        <!-- Fingerboard -->
-                        <div class="relative w-32 h-full bg-[#0f0e0d] border-x-4 border-[#2c241b] shadow-2xl flex justify-around px-2 py-4 cursor-pointer" id="fingerboard">
-                            <canvas id="canvas-violin" class="absolute inset-0 w-full h-full z-10"></canvas>
-                            <div id="finger-indicator" class="absolute w-full h-4 bg-white/20 pointer-events-none hidden rounded blur-[2px] border-y border-white/30"></div>
-                        </div>
-                        <div class="absolute bottom-20 w-48 h-10 bg-[#d7ccc8] rounded-t-[50%] border-b-4 border-[#a1887f] opacity-90 pointer-events-none transform translate-y-1/2 shadow-lg z-20"></div>
-                    </div>
-
-                    <div class="lg:w-80 bg-slate-800 p-5 rounded-xl border border-slate-700 flex flex-col gap-6">
-                        <div class="text-center pb-4 border-b border-slate-700">
-                            <div class="text-sm text-slate-400 mb-2">當前拉奏</div>
-                            <div class="text-6xl font-mono font-black text-amber-300 my-4 drop-shadow-[0_0_15px_rgba(251,191,36,0.3)]" id="violin-hz">-- Hz</div>
-                            <div class="bg-black/60 rounded-xl p-6 border-2 border-amber-500/50 shadow-lg mt-4">
-                                <div class="flex justify-center items-baseline gap-4">
-                                    <div class="text-6xl text-white font-black tracking-tighter" id="violin-note-name">--</div>
-                                    <div class="text-4xl text-amber-400 font-bold" id="violin-solfege">--</div>
-                                </div>
-                                <div class="text-xs text-slate-500 mt-2 uppercase tracking-widest">Note / Solfege</div>
-                            </div>
-                        </div>
-                        <div class="space-y-4">
-                            <h3 class="font-bold text-slate-300 text-lg">弦樂物理</h3>
-                            <div class="text-sm text-slate-400 bg-slate-900 p-4 rounded-lg border border-slate-700 leading-relaxed">
-                                <p class="mb-2"><strong>調音原理：</strong></p>
-                                <ul class="list-disc list-inside space-y-1">
-                                    <li>轉緊弦 (Tension↑) = 頻率變高</li>
-                                    <li>轉鬆弦 (Tension↓) = 頻率變低</li>
-                                </ul>
-                                <p class="mt-3"><strong>按弦原理：</strong></p>
-                                <p>按住指板縮短弦長 (Length↓) = 頻率變高</p>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-             <!-- Tab 5: Wind Lab (Recorder) -->
-            <div id="tab-wind" class="tab-content hidden h-full flex flex-col p-4 bg-slate-900">
-                <div class="flex justify-between items-center mb-4">
-                    <div>
-                        <h2 class="text-2xl font-bold flex items-center gap-2"><i data-lucide="mic-2" class="text-amber-100"></i> 管樂實驗 (高音直笛)</h2>
-                        <p class="text-xs text-slate-400 mt-1">第一開孔理論：空氣柱長度終止於第一個打開的孔洞。</p>
-                    </div>
-                    <div class="flex items-center gap-6 bg-slate-800/50 p-2 pr-6 rounded-full border border-slate-700">
-                         <div class="text-right flex flex-col items-end">
-                             <div class="text-5xl font-bold text-amber-100 font-mono drop-shadow-md" id="recorder-hz">-- Hz</div>
-                             <div class="flex gap-3 justify-end items-baseline mt-1">
-                                 <span class="text-4xl text-white font-black" id="recorder-note-name">--</span>
-                                 <span class="text-3xl text-amber-400 font-bold" id="recorder-solfege">--</span>
-                             </div>
-                        </div>
-                        <button onmousedown="playRecorder()" onmouseup="stopRecorder()" onmouseleave="stopRecorder()" class="bg-amber-800 hover:bg-amber-700 w-24 h-24 rounded-full border-4 border-amber-950 shadow-xl active:scale-95 transition flex flex-col items-center justify-center text-amber-100 shrink-0">
-                            <i data-lucide="wind" class="w-10 h-10"></i>
-                            <span class="text-sm font-bold mt-1">吹氣</span>
-                        </button>
-                    </div>
-                </div>
-
-                <div class="flex-1 flex gap-16 justify-center overflow-y-auto py-4">
-                    <div class="relative w-16 recorder-body rounded-full flex flex-col items-center shadow-2xl scale-110 origin-top">
-                        <div class="w-20 h-24 rounded-t-xl recorder-body border-b border-amber-200/50 flex flex-col items-center relative z-20">
-                            <div class="w-12 h-4 bg-[#fdfbf7] mt-0 rounded-b-lg border border-amber-100"></div>
-                            <div class="w-8 h-10 bg-black mt-4 rounded-sm shadow-inner"></div>
-                        </div>
-                        <div class="w-16 flex-1 recorder-body flex flex-col items-center relative z-10 border-t border-b border-[#d1c496] pt-12 gap-5">
-                            <div class="recorder-hole recorder-hole-base" id="hole-0" onclick="toggleRecorderHole(0)"></div>
-                            <div class="recorder-hole recorder-hole-base" id="hole-1" onclick="toggleRecorderHole(1)"></div>
-                            <div class="recorder-hole recorder-hole-base" id="hole-2" onclick="toggleRecorderHole(2)"></div>
-                            <div class="recorder-hole recorder-hole-base" id="hole-3" onclick="toggleRecorderHole(3)"></div>
-                            <div class="recorder-hole recorder-hole-base" id="hole-4" onclick="toggleRecorderHole(4)"></div>
-                            <div class="double-hole-container" onclick="toggleRecorderHole(5)" id="hole-5-container">
-                                <div class="recorder-hole-small recorder-hole-base" id="hole-5a"></div>
-                                <div class="recorder-hole-tiny recorder-hole-base" id="hole-5b"></div>
-                            </div>
-                            <div class="double-hole-container" onclick="toggleRecorderHole(6)" id="hole-6-container">
-                                <div class="recorder-hole-small recorder-hole-base" id="hole-6a"></div>
-                                <div class="recorder-hole-tiny recorder-hole-base" id="hole-6b"></div>
-                            </div>
-                        </div>
-                         <div class="w-20 h-16 rounded-b-xl recorder-body border-t border-amber-200/50 flex flex-col items-center justify-end pb-2 relative z-20">
-                             <div class="w-24 h-4 bg-[#e6dba0] rounded-full blur-[1px]"></div>
-                         </div>
-                    </div>
-
-                    <div class="flex flex-col gap-4 pt-10">
-                        <div class="w-40 bg-slate-800 rounded-lg border border-slate-700 p-3 flex flex-col relative h-[450px]">
-                            <div class="text-center text-sm text-slate-400 mb-2 font-bold">有效空氣柱長度</div>
-                            <div class="flex-1 bg-slate-900 rounded relative overflow-hidden border border-slate-700">
-                                <div class="absolute right-0 top-0 bottom-0 w-6 border-l border-slate-700 flex flex-col justify-between text-[10px] text-slate-500 py-1 px-1 font-mono">
-                                    <span>Top</span><span>Bot</span>
-                                </div>
-                                <div id="air-column" class="absolute top-0 left-0 right-6 bg-blue-500/50 backdrop-blur border-b-2 border-blue-400 air-column-bar flex items-end justify-center pb-2 shadow-[0_0_15px_rgba(59,130,246,0.5)]" style="height: 100%;">
-                                    <div class="text-white text-sm font-bold drop-shadow-md text-center">
-                                        <i data-lucide="arrow-up" class="w-5 h-5 mx-auto mb-1 animate-bounce"></i>
-                                        振動節點
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="w-40 bg-slate-800 p-4 rounded-lg border border-slate-700 text-sm text-slate-400">
-                            <p class="mb-2 font-bold text-amber-100 text-lg">原理說明</p>
-                            <p class="leading-relaxed">音高取決於<span class="text-blue-400 font-bold">第一個打開孔洞</span>的位置。</p>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
+            <!-- Tab: Loudness -->
+            <div id="tab-loudness" class="tab-content hidden h-full flex flex-col p-4"><div class="flex justify-between items-center mb-4"><h2 class="text-2xl font-bold flex items-center gap-2"><i data-lucide="megaphone" class="text-red-400"></i> 大聲公測試</h2><button onclick="toggleLoudnessMic()" id="loudness-mic-btn" class="bg-red-600 hover:bg-red-500 px-4 py-2 rounded font-bold shadow flex items-center gap-2 text-sm">啟動分貝計</button></div><div class="flex flex-1 gap-6 flex-col lg:flex-row"><div class="flex-1 bg-slate-800 rounded-xl p-8 flex flex-col items-center justify-center border border-slate-700 relative overflow-hidden"><div class="text-center z-10"><div class="text-slate-400 text-sm">Current Decibels</div><div class="text-9xl font-black text-white font-mono data-highlight" id="db-display">00</div><div class="text-2xl text-slate-500 font-bold">dB</div></div><div class="absolute top-4 right-4 bg-black/40 px-3 py-1 rounded text-xs text-slate-400">Max: <span class="text-yellow-400 font-bold text-lg" id="db-max">0</span></div><div class="absolute right-8 bottom-8 top-24 w-6 db-bar-container"><div class="db-bar-fill" id="db-bar" style="height:0%"></div></div><div id="db-pulse" class="absolute inset-0 pointer-events-none"></div></div><div class="lg:w-80 flex flex-col gap-4"><div class="bg-slate-800 p-4 rounded-xl border border-slate-700"><div class="flex justify-between items-center mb-2"><h3 class="font-bold text-slate-200 text-sm">噪音過濾</h3></div><div class="space-y-1"><div class="flex justify-between text-xs text-blue-300"><span id="gate-val">30 dB</span></div><input type="range" id="noise-gate" min="0" max="80" value="30" class="w-full h-1 bg-slate-700 rounded appearance-none accent-blue-500" oninput="document.getElementById('gate-val').innerText=this.value+' dB'"></div></div></div></div></div>
+            <!-- Other Tabs (Medium, Doppler, Violin, Wind, Beats, Life, Pitch Expert, Pitch Coach) kept for full functionality -->
+            <div id="tab-medium" class="tab-content hidden h-full p-4"><div class="h-full flex flex-col overflow-y-auto"><div class="mb-4 flex justify-between items-center"><h2 class="text-2xl font-bold">聲速與介質</h2><button onclick="triggerPulse()" class="bg-blue-600 hover:bg-blue-500 px-4 py-2 rounded text-sm font-bold shadow">發送脈衝</button></div><div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4"><div class="bg-slate-800 p-4 rounded border border-slate-700 text-sm text-slate-300"><h3 class="font-bold text-white mb-2">物理原理：</h3><ul class="list-disc list-inside mt-1 text-xs text-slate-400 space-y-2"><li><strong>密度：</strong> 固體粒子緊密，傳導最快。</li><li><strong>溫度：</strong> <span class="text-yellow-400 font-bold">溫度越高，聲速越快。</span></li></ul></div><div class="bg-slate-800 p-4 rounded border border-slate-700 flex flex-col justify-center"><div class="flex justify-between mb-2 text-sm font-bold"><span>環境溫度</span><span id="temp-display" class="text-red-400 font-mono text-xl">20°C</span></div><input type="range" id="temp-slider" min="-20" max="100" value="20" class="w-full" oninput="updateTemperature()"></div></div><div class="flex-1 flex flex-col gap-4 min-h-[400px]"><div class="flex-1 relative bg-slate-800 rounded border-l-4 border-purple-500 overflow-hidden"><div class="flex justify-between p-2 text-xs font-bold text-purple-400 relative z-10"><span>固體 (鋼鐵)</span><span id="speed-solid">5000 m/s</span></div><canvas id="canvas-solid" class="w-full h-full absolute top-0 left-0"></canvas></div><div class="flex-1 relative bg-slate-800 rounded border-l-4 border-blue-500 overflow-hidden"><div class="flex justify-between p-2 text-xs font-bold text-blue-400 relative z-10"><span>液體 (水)</span><span id="speed-liquid">1482 m/s</span></div><canvas id="canvas-liquid" class="w-full h-full absolute top-0 left-0"></canvas></div><div class="flex-1 relative bg-slate-800 rounded border-l-4 border-green-500 overflow-hidden"><div class="flex justify-between p-2 text-xs font-bold text-green-400 relative z-10"><span>氣體 (空氣)</span><span id="speed-gas" class="text-lg data-highlight">343 m/s</span></div><canvas id="canvas-gas" class="w-full h-full absolute top-0 left-0"></canvas></div></div></div></div>
+            <div id="tab-doppler" class="tab-content hidden h-full p-4"><div class="h-full flex flex-col"><div class="flex justify-between mb-4"><div class="flex items-center gap-4"><h2 class="text-2xl font-bold">都卜勒效應</h2><button onclick="toggleModal('info-doppler')" class="bg-slate-700 hover:bg-slate-600 px-3 py-1 rounded text-sm text-white flex items-center gap-1 border border-slate-600"><i data-lucide="book-open" class="w-4 h-4"></i> 說明</button></div><div class="flex gap-2"><label class="flex items-center gap-1 text-sm select-none cursor-pointer bg-slate-800 px-2 rounded border border-slate-700"><input type="checkbox" id="doppler-sound-toggle" onchange="toggleDopplerSound()">音效</label><button onclick="resetDoppler()" class="bg-slate-700 px-3 py-1 rounded text-sm hover:bg-slate-600">重置</button></div></div><div id="info-doppler" class="hidden fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" onclick="toggleModal('info-doppler')"><div class="bg-slate-800 p-6 rounded-lg max-w-md w-full border border-slate-600 shadow-2xl" onclick="event.stopPropagation()"><div class="flex justify-between items-center mb-4"><h3 class="font-bold text-xl text-white">物理原理：都卜勒效應</h3><button onclick="toggleModal('info-doppler')"><i data-lucide="x"></i></button></div><p class="text-slate-300 text-sm mb-3">當波源相對於觀察者移動時，觀察者接收到的頻率會發生變化。</p><div class="bg-slate-900 p-3 rounded text-xs text-slate-400 mb-3"><strong>🚑 生活實例：</strong><br>救護車靠近時，聲音變<strong>尖銳（高頻）</strong>；遠離時，聲音變<strong>低沉（低頻）</strong>。</div><ul class="list-disc list-inside space-y-1 text-slate-300 text-sm"><li><span class="text-green-400 font-bold">接近時：</span> 波長變短 → 頻率變高。</li><li><span class="text-blue-400 font-bold">遠離時：</span> 波長變長 → 頻率變低。</li></ul></div></div><div class="flex-1 bg-slate-800 rounded relative overflow-hidden border border-slate-700 cursor-crosshair" id="doppler-container"><canvas id="canvas-doppler" class="w-full h-full"></canvas><div class="absolute bottom-4 left-4 bg-black/60 p-4 rounded border border-slate-600 backdrop-blur-sm shadow-xl"><div class="text-sm text-slate-400 uppercase tracking-widest">Observed Frequency</div><div class="text-5xl font-mono font-black text-green-400 mt-1 data-highlight"><span id="doppler-obs-hz">440</span> Hz</div><div class="text-xs text-slate-500 mt-2">拖曳藍點移動聲源</div></div><div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-none flex flex-col items-center text-slate-500"><i data-lucide="ear" class="w-8 h-8"></i><span class="text-xs">觀察者</span></div></div></div></div>
+            <div id="tab-violin" class="tab-content hidden h-full p-4"><div class="h-full flex flex-col"><div class="flex justify-between mb-4"><div class="flex items-center gap-4"><h2 class="text-2xl font-bold">弦樂實驗</h2><button onclick="toggleModal('info-violin')" class="bg-slate-700 hover:bg-slate-600 px-3 py-1 rounded text-sm text-white flex items-center gap-1 border border-slate-600"><i data-lucide="book-open" class="w-4 h-4"></i> 說明與原理</button></div><button onclick="resetViolin()" class="bg-amber-700 px-3 py-1 rounded text-sm">一鍵調音</button></div><div id="info-violin" class="hidden fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" onclick="toggleModal('info-violin')"><div class="bg-slate-800 p-6 rounded-lg max-w-md w-full border border-slate-600 shadow-2xl" onclick="event.stopPropagation()"><div class="flex justify-between items-center mb-4"><h3 class="font-bold text-xl text-amber-400">弦樂物理原理</h3><button onclick="toggleModal('info-violin')"><i data-lucide="x"></i></button></div><div class="space-y-3 text-slate-300 text-sm"><div class="bg-slate-900 p-3 rounded font-mono text-center text-amber-100 my-2">f ∝ √(張力) / (弦長 × √密度)</div><ul class="list-disc list-inside space-y-2"><li><strong>弦長：</strong> 按壓指板使弦變短 → 頻率變高。</li><li><strong>張力：</strong> 轉緊琴軸使張力變大 → 頻率變高。</li></ul></div></div></div><div class="flex-1 flex flex-col lg:flex-row gap-4"><div class="flex-1 bg-[#1a1510] rounded relative shadow-2xl" id="violin-body"><div class="absolute top-4 left-4 z-30 bg-black/50 p-2 rounded text-xs text-slate-300 pointer-events-none"><p class="font-bold text-amber-500 mb-1">操作指南：</p><p>1. 拖曳琴軸調音 (↑緊 ↓鬆)</p><p>2. 在指板上滑動按弦</p></div><div class="flex justify-around mt-8 px-8 relative z-10"><div class="w-16 h-16 bg-[#4e342e] rounded-full border-4 border-[#3e2723] cursor-ns-resize flex items-center justify-center peg-hit-area" onmousedown="startTuning(0)"><div class="w-2 h-10 bg-[#271c19] rounded rotate-45 transform transition-transform" id="peg-0"></div></div><div class="w-16 h-16 bg-[#4e342e] rounded-full border-4 border-[#3e2723] cursor-ns-resize flex items-center justify-center peg-hit-area" onmousedown="startTuning(1)"><div class="w-2 h-10 bg-[#271c19] rounded -rotate-45 transform transition-transform" id="peg-1"></div></div><div class="w-16 h-16 bg-[#4e342e] rounded-full border-4 border-[#3e2723] cursor-ns-resize flex items-center justify-center peg-hit-area" onmousedown="startTuning(2)"><div class="w-2 h-10 bg-[#271c19] rounded rotate-45 transform transition-transform" id="peg-2"></div></div><div class="w-16 h-16 bg-[#4e342e] rounded-full border-4 border-[#3e2723] cursor-ns-resize flex items-center justify-center peg-hit-area" onmousedown="startTuning(3)"><div class="w-2 h-10 bg-[#271c19] rounded -rotate-45 transform transition-transform" id="peg-3"></div></div></div><div class="relative w-24 h-96 bg-[#0f0e0d] border-x-4 border-[#2c241b] mx-auto mt-4 cursor-pointer" id="fingerboard"><canvas id="canvas-violin" class="w-full h-full absolute inset-0"></canvas><div id="finger-indicator" class="absolute w-full h-4 bg-white/20 hidden rounded border-y border-white/30"></div></div></div><div class="lg:w-80 bg-slate-800 p-6 rounded-xl border border-slate-700 flex flex-col justify-center text-center"><div class="text-slate-400 text-sm mb-2 uppercase tracking-widest">Current Pitch</div><div class="text-7xl font-black text-amber-400 mb-4 drop-shadow-xl font-mono data-highlight" id="violin-hz">--</div><div class="bg-black/40 rounded-xl p-6 border border-slate-600"><div class="flex justify-center items-baseline gap-4"><div class="text-6xl font-black text-white" id="violin-note-name">--</div><div class="text-4xl font-bold text-amber-500" id="violin-solfege">--</div></div></div></div></div></div></div>
+            <div id="tab-wind" class="tab-content hidden h-full p-4"><div class="h-full flex flex-col"><div class="flex justify-between mb-4 items-center"><div class="flex items-center gap-4"><h2 class="text-2xl font-bold">管樂實驗</h2><button onclick="toggleModal('info-wind')" class="bg-slate-700 hover:bg-slate-600 px-3 py-1 rounded text-sm text-white flex items-center gap-1 border border-slate-600"><i data-lucide="book-open" class="w-4 h-4"></i> 說明</button></div><div class="flex items-center gap-6 bg-slate-800 px-6 py-2 rounded-xl border border-slate-700"><div class="text-right"><div class="text-5xl font-bold text-amber-100 font-mono drop-shadow-md data-highlight" id="recorder-hz">--</div></div><div class="text-right border-l border-slate-600 pl-6"><div class="text-4xl font-black text-white" id="recorder-note-name">--</div><div class="text-2xl font-bold text-amber-400" id="recorder-solfege">--</div></div></div></div><div id="info-wind" class="hidden fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" onclick="toggleModal('info-wind')"><div class="bg-slate-800 p-6 rounded-lg max-w-md w-full border border-slate-600 shadow-2xl" onclick="event.stopPropagation()"><div class="flex justify-between items-center mb-4"><h3 class="font-bold text-xl text-amber-400">管樂物理原理</h3><button onclick="toggleModal('info-wind')"><i data-lucide="x"></i></button></div><div class="space-y-3 text-slate-300 text-sm"><p><strong>空氣柱與音高：</strong> 直笛屬於「開管樂器」。音高取決於管內振動的空氣柱長度。</p><div class="bg-slate-900 p-3 rounded border border-slate-600 text-xs text-center"><p class="mb-1"><strong>有效長度 (L)：</strong> 吹嘴到<span class="text-blue-300">第一個打開孔洞</span>的距離。</p><p>頻率 與 長度 成反比 ( f ∝ 1 / L )</p></div><ul class="list-disc list-inside space-y-2"><li><strong>全部按住：</strong> 空氣柱最長 → 頻率最低 (C5)。</li><li><strong>放開孔洞：</strong> 空氣柱變短 → 頻率變高。</li></ul></div></div></div><div class="flex-1 flex justify-center gap-16 overflow-y-auto pt-4"><div class="relative w-20 recorder-body rounded-full flex flex-col items-center pt-8 gap-6 pb-8 shadow-2xl border border-[#d1c496] scale-100 origin-top"><div class="w-16 h-24 bg-[#fdfbf7] border-b border-amber-200 rounded-t-2xl relative flex justify-center -mt-4"><div class="w-10 h-5 bg-black/80 rounded-b-lg absolute bottom-4 shadow-inner"></div><button onclick="toggleRecorderState()" id="recorder-btn" class="absolute -top-6 w-20 h-16 bg-amber-900 rounded-t-xl text-white text-xs flex items-center justify-center shadow-lg hover:bg-amber-800 transition cursor-pointer border-t border-amber-700 font-bold z-50 opacity-90"><span id="recorder-btn-text">點擊<br>吹氣</span></button></div><div class="flex flex-col gap-5 w-full items-center pt-4"><div class="recorder-hole recorder-hole-base recorder-back-hole" id="hole-0" onclick="toggleRecorderHole(0)" title="背面(拇指)孔"></div><div class="h-4"></div><div class="recorder-hole recorder-hole-base" id="hole-1" onclick="toggleRecorderHole(1)"></div><div class="recorder-hole recorder-hole-base" id="hole-2" onclick="toggleRecorderHole(2)"></div><div class="recorder-hole recorder-hole-base" id="hole-3" onclick="toggleRecorderHole(3)"></div><div class="h-2"></div><div class="recorder-hole recorder-hole-base" id="hole-4" onclick="toggleRecorderHole(4)"></div><div class="recorder-hole recorder-hole-base" id="hole-5" onclick="toggleRecorderHole(5)"></div><div class="double-hole-container" onclick="toggleRecorderHole(6)"><div class="recorder-hole-small recorder-hole-base" id="hole-6a"></div><div class="recorder-hole-tiny recorder-hole-base" id="hole-6b"></div></div><div class="double-hole-container" onclick="toggleRecorderHole(7)"><div class="recorder-hole-small recorder-hole-base" id="hole-7a"></div><div class="recorder-hole-tiny recorder-hole-base" id="hole-7b"></div></div></div><div class="w-24 h-8 rounded-b-xl recorder-body border-t border-amber-200 flex justify-center items-end pb-1"><div class="w-20 h-2 bg-[#e6dba0] rounded-full opacity-50"></div></div></div><div class="w-64 flex flex-col gap-4 pt-10"><div class="bg-slate-800 rounded-xl border border-slate-700 p-4 relative h-[500px] flex flex-col"><div class="text-center text-sm text-slate-400 mb-4 font-bold uppercase tracking-widest">Air Column Length</div><div class="flex-1 bg-slate-900 rounded border border-slate-600 overflow-hidden relative"><div class="absolute top-0 left-0 right-0 bg-blue-500/40 air-column-bar border-b-4 border-blue-400 flex justify-center items-end pb-2 shadow-[0_0_20px_rgba(59,130,246,0.6)]" id="air-column" style="height:10%"><div class="text-white text-xs font-bold bg-blue-600 px-2 py-1 rounded shadow animate-bounce">Node (波節)</div></div></div></div></div></div></div></div>
+            <div id="tab-life" class="tab-content hidden h-full flex flex-col p-4 overflow-y-auto"><h2 class="text-2xl font-bold flex items-center gap-2 mb-6"><i data-lucide="coffee" class="text-green-400"></i> 生活中的聲音</h2><div class="mb-8 bg-slate-800 p-6 rounded-xl border border-amber-600/50 shadow-lg"><h3 class="text-lg font-bold text-amber-400 mb-4 border-b border-slate-600 pb-2 flex items-center gap-2"><i data-lucide="music" class="w-5 h-5"></i> 經典古典樂廳</h3><div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4"><button onclick="playSynthSound('joy')" class="life-btn bg-slate-700 hover:bg-amber-900/50 p-4 rounded-lg flex flex-col items-center gap-2 transition group"><i data-lucide="music-2" class="w-8 h-8 text-amber-200 group-hover:animate-bounce"></i><span class="text-sm font-bold text-amber-100">貝多芬 - 歡樂頌</span></button><button onclick="playSynthSound('mozart40')" class="life-btn bg-slate-700 hover:bg-red-900/50 p-4 rounded-lg flex flex-col items-center gap-2 transition group"><i data-lucide="music-4" class="w-8 h-8 text-red-200 group-hover:animate-bounce"></i><span class="text-sm font-bold text-red-100">莫札特 - G小調40號</span></button><button onclick="playSynthSound('airg')" class="life-btn bg-slate-700 hover:bg-blue-900/50 p-4 rounded-lg flex flex-col items-center gap-2 transition group"><i data-lucide="wind" class="w-8 h-8 text-blue-200 group-hover:animate-bounce"></i><span class="text-sm font-bold text-blue-100">巴哈 - G弦之歌</span></button><button onclick="playSynthSound('swan')" class="life-btn bg-slate-700 hover:bg-purple-900/50 p-4 rounded-lg flex flex-col items-center gap-2 transition group"><i data-lucide="feather" class="w-8 h-8 text-purple-200 group-hover:animate-bounce"></i><span class="text-sm font-bold text-purple-100">柴可夫斯基 - 天鵝湖</span></button><button onclick="playSynthSound('carnival')" class="life-btn bg-slate-700 hover:bg-yellow-900/50 p-4 rounded-lg flex flex-col items-center gap-2 transition group"><i data-lucide="paw-print" class="w-8 h-8 text-yellow-200 group-hover:animate-bounce"></i><span class="text-sm font-bold text-yellow-100">聖桑 - 動物狂歡節(獅子)</span></button><button onclick="playSynthSound('nutcracker')" class="life-btn bg-slate-700 hover:bg-pink-900/50 p-4 rounded-lg flex flex-col items-center gap-2 transition group"><i data-lucide="sparkles" class="w-8 h-8 text-pink-200 group-hover:animate-bounce"></i><span class="text-sm font-bold text-pink-100">胡桃鉗 - 糖梅仙子</span></button><button onclick="playSynthSound('goose')" class="life-btn bg-slate-700 hover:bg-emerald-900/50 p-4 rounded-lg flex flex-col items-center gap-2 transition group"><i data-lucide="bird" class="w-8 h-8 text-emerald-200 group-hover:animate-bounce"></i><span class="text-sm font-bold text-emerald-100">拉威爾 - 鵝媽媽</span></button><button onclick="playSynthSound('peter')" class="life-btn bg-slate-700 hover:bg-orange-900/50 p-4 rounded-lg flex flex-col items-center gap-2 transition group"><i data-lucide="user" class="w-8 h-8 text-orange-200 group-hover:animate-bounce"></i><span class="text-sm font-bold text-orange-100">普羅高菲夫 - 彼得與狼</span></button><button onclick="playSynthSound('pastoral')" class="life-btn bg-slate-700 hover:bg-lime-900/50 p-4 rounded-lg flex flex-col items-center gap-2 transition group"><i data-lucide="mountain" class="w-8 h-8 text-lime-200 group-hover:animate-bounce"></i><span class="text-sm font-bold text-lime-100">貝多芬 - 田園交響曲</span></button></div><h4 class="text-sm font-bold text-amber-200/70 mt-6 mb-2 border-b border-slate-700 pb-1">韋瓦第：四季小提琴協奏曲</h4><div class="grid grid-cols-2 sm:grid-cols-4 gap-4"><button onclick="playSynthSound('spring')" class="life-btn bg-slate-700 hover:bg-green-800 p-3 rounded text-xs text-green-100 font-bold">🌸 春 (Spring)</button><button onclick="playSynthSound('summer')" class="life-btn bg-slate-700 hover:bg-red-800 p-3 rounded text-xs text-red-100 font-bold">☀️ 夏 (Summer)</button><button onclick="playSynthSound('autumn')" class="life-btn bg-slate-700 hover:bg-orange-800 p-3 rounded text-xs text-orange-100 font-bold">🍁 秋 (Autumn)</button><button onclick="playSynthSound('winter')" class="life-btn bg-slate-700 hover:bg-cyan-800 p-3 rounded text-xs text-cyan-100 font-bold">❄️ 冬 (Winter)</button></div></div><div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"><div class="bg-slate-800 p-6 rounded-xl border border-slate-700"><h3 class="text-lg font-bold text-slate-300 mb-4 border-b border-slate-600 pb-2">人工與警示音</h3><div class="grid grid-cols-2 gap-4"><button onclick="playSynthSound('siren')" class="life-btn bg-slate-700 hover:bg-red-900/50 p-4 rounded-lg flex flex-col items-center gap-2 transition group"><i data-lucide="siren" class="w-8 h-8 text-red-400 group-hover:animate-pulse"></i><span class="text-sm">警笛聲</span></button><button onclick="playSynthSound('phone')" class="life-btn bg-slate-700 hover:bg-blue-900/50 p-4 rounded-lg flex flex-col items-center gap-2 transition"><i data-lucide="phone" class="w-8 h-8 text-blue-400"></i><span class="text-sm">電話鈴聲</span></button><button onclick="playSynthSound('alarm')" class="life-btn bg-slate-700 hover:bg-yellow-900/50 p-4 rounded-lg flex flex-col items-center gap-2 transition"><i data-lucide="bell" class="w-8 h-8 text-yellow-400"></i><span class="text-sm">鬧鐘</span></button><button onclick="playSynthSound('game')" class="life-btn bg-slate-700 hover:bg-purple-900/50 p-4 rounded-lg flex flex-col items-center gap-2 transition"><i data-lucide="gamepad-2" class="w-8 h-8 text-purple-400"></i><span class="text-sm">8-bit 跳躍</span></button><button onclick="playSynthSound('typing')" class="life-btn bg-slate-700 hover:bg-gray-600 p-4 rounded-lg flex flex-col items-center gap-2 transition"><i data-lucide="keyboard" class="w-8 h-8 text-gray-400"></i><span class="text-sm">打字聲</span></button><button onclick="playSynthSound('camera')" class="life-btn bg-slate-700 hover:bg-gray-600 p-4 rounded-lg flex flex-col items-center gap-2 transition"><i data-lucide="camera" class="w-8 h-8 text-gray-300"></i><span class="text-sm">快門聲</span></button></div></div><div class="bg-slate-800 p-6 rounded-xl border border-slate-700"><h3 class="text-lg font-bold text-slate-300 mb-4 border-b border-slate-600 pb-2">自然與環境 (模擬)</h3><div class="grid grid-cols-2 gap-4"><button onclick="playSynthSound('bird')" class="life-btn bg-slate-700 hover:bg-green-900/50 p-4 rounded-lg flex flex-col items-center gap-2 transition"><i data-lucide="bird" class="w-8 h-8 text-green-400"></i><span class="text-sm">小鳥叫</span></button><button onclick="playSynthSound('dog')" class="life-btn bg-slate-700 hover:bg-orange-900/50 p-4 rounded-lg flex flex-col items-center gap-2 transition"><i data-lucide="dog" class="w-8 h-8 text-orange-400"></i><span class="text-sm">小狗叫</span></button><button onclick="playSynthSound('rain')" class="life-btn bg-slate-700 hover:bg-cyan-900/50 p-4 rounded-lg flex flex-col items-center gap-2 transition"><i data-lucide="cloud-rain" class="w-8 h-8 text-cyan-400"></i><span class="text-sm">下雨聲</span></button><button onclick="playSynthSound('thunder')" class="life-btn bg-slate-700 hover:bg-slate-900 p-4 rounded-lg flex flex-col items-center gap-2 transition"><i data-lucide="cloud-lightning" class="w-8 h-8 text-yellow-200"></i><span class="text-sm">雷聲</span></button><button onclick="playSynthSound('traffic')" class="life-btn bg-slate-700 hover:bg-stone-600 p-4 rounded-lg flex flex-col items-center gap-2 transition"><i data-lucide="car" class="w-8 h-8 text-stone-400"></i><span class="text-sm">交通噪音</span></button><button onclick="playSynthSound('heart')" class="life-btn bg-slate-700 hover:bg-pink-900/50 p-4 rounded-lg flex flex-col items-center gap-2 transition"><i data-lucide="heart" class="w-8 h-8 text-pink-400"></i><span class="text-sm">心跳聲</span></button></div></div></div></div>
+            <div id="tab-pitch-expert" class="tab-content hidden h-full flex flex-col p-4 bg-slate-900 overflow-y-auto"><div class="flex justify-between items-center mb-4"><h2 class="text-2xl font-bold flex items-center gap-2"><i data-lucide="graduation-cap" class="text-indigo-400"></i> 音高專家</h2><button onclick="toggleTunerMode()" id="tuner-btn" class="bg-indigo-600 hover:bg-indigo-500 px-4 py-2 rounded font-bold text-sm flex items-center gap-2 transition"><i data-lucide="mic"></i> 開啟自由調音器</button></div><div class="flex flex-col gap-8"><div class="bg-slate-800 p-6 rounded-2xl border-t-4 border-indigo-500 shadow-2xl relative overflow-x-auto"><div class="flex justify-between mb-2 px-2"><h3 class="text-lg text-slate-300 font-bold">虛擬鋼琴 (C3 - C6)</h3></div><div class="relative h-48 min-w-[800px] flex justify-center select-none bg-black/20 rounded-lg p-1" id="piano-container"></div><div class="text-center mt-6 h-16"><div id="piano-display" class="transition-opacity duration-500 opacity-0 drop-shadow-lg"><div class="text-4xl font-black text-white font-mono mb-1" id="piano-disp-hz">-- Hz</div><div class="flex justify-center gap-4 items-baseline"><div class="text-3xl font-bold text-indigo-400" id="piano-disp-note">--</div><div class="text-2xl font-bold text-indigo-300" id="piano-disp-solfege">--</div></div></div></div></div><div class="bg-slate-800 p-8 rounded-2xl border border-slate-700 flex flex-col items-center text-center relative overflow-hidden shadow-xl"><div id="tuner-overlay" class="absolute inset-0 bg-slate-900/90 flex flex-col items-center justify-center z-20 backdrop-blur-sm"><p class="text-slate-300 text-lg mb-4 font-bold">點擊上方按鈕啟動「自由調音器」</p></div><div class="w-full max-w-lg relative pt-10 pb-4"><div class="w-full h-40 border-b-4 border-slate-600 relative overflow-hidden mb-6"><div class="absolute bottom-0 left-1/2 w-1 h-full bg-slate-700 origin-bottom -translate-x-1/2"></div><div id="expert-needle" class="absolute bottom-0 left-1/2 w-2 h-36 bg-red-500 origin-bottom -translate-x-1/2 transition-transform duration-200 shadow-lg" style="transform: rotate(0deg); border-radius: 4px;"></div><div class="absolute bottom-2 w-full flex justify-between px-12 text-sm text-slate-500 font-bold"><span>Flat</span><span class="text-green-500">Perfect</span><span>Sharp</span></div></div><div class="mt-6 space-y-4"><div class="text-6xl font-black text-white font-mono data-highlight" id="expert-hz">-- Hz</div><div class="flex justify-center gap-8 items-baseline"><div class="text-5xl font-bold text-indigo-400" id="expert-note">--</div><div class="text-4xl font-bold text-indigo-300" id="expert-solfege">--</div></div></div></div><div class="mt-8 w-full max-w-md bg-slate-900 p-4 rounded-lg border border-slate-700 text-left"><div class="flex justify-between text-sm text-slate-400 mb-2"><span>噪音門檻 (過濾背景音)</span><span id="expert-gate-val">40 dB</span></div><input type="range" id="expert-gate" min="0" max="80" value="40" class="w-full h-2 bg-slate-700 rounded appearance-none accent-indigo-500" oninput="document.getElementById('expert-gate-val').innerText=this.value+' dB'"></div></div></div></div>
+            <div id="tab-pitch-coach" class="tab-content hidden h-full flex flex-col p-4 bg-slate-900 overflow-y-auto"><div class="flex justify-between items-center mb-8"><h2 class="text-2xl font-bold flex items-center gap-2"><i data-lucide="mic-2" class="text-emerald-400"></i> 音準教練</h2><div class="flex bg-slate-800 rounded-lg p-1 border border-slate-600"><button onclick="setCoachMode('training')" id="btn-mode-training" class="px-4 py-1.5 rounded text-sm font-bold transition bg-emerald-600 text-white">訓練模式</button><button onclick="setCoachMode('scoring')" id="btn-mode-scoring" class="px-4 py-1.5 rounded text-sm font-bold transition text-slate-400 hover:text-white">評分模式</button></div></div><div class="max-w-2xl mx-auto w-full bg-slate-800 rounded-3xl p-8 border-2 border-emerald-500/30 shadow-2xl relative overflow-hidden"><div id="coach-start-screen" class="absolute inset-0 bg-slate-800 z-30 flex flex-col items-center justify-center text-center p-8"><i data-lucide="music" class="w-16 h-16 text-emerald-400 mb-4"></i><h3 class="text-3xl font-bold text-white mb-2" id="coach-title">聽音準訓練</h3><p class="text-slate-400 mb-8" id="coach-desc">系統會播放一個音高，請試著唱出一樣的聲音！</p><button onclick="startCoachGame()" class="bg-emerald-600 hover:bg-emerald-500 text-white px-8 py-4 rounded-full font-bold text-xl shadow-lg hover:scale-105 transition-transform">開始</button></div><div id="coach-score-screen" class="absolute inset-0 bg-slate-900 z-40 flex flex-col items-center justify-center text-center p-8 hidden"><h3 class="text-2xl font-bold text-white mb-4">評分結果</h3><div class="text-9xl font-black text-yellow-400 mb-4" id="final-score">0</div><p class="text-slate-300 text-xl mb-8" id="final-comment">...</p><button onclick="resetCoachGame()" class="bg-slate-700 hover:bg-slate-600 text-white px-6 py-3 rounded-lg font-bold">再試一次</button></div><div class="flex flex-col items-center"><div class="text-slate-400 uppercase tracking-widest text-sm mb-2">Target Note</div><div class="flex items-center gap-4 mb-8"><div class="text-6xl font-black text-white" id="game-target-note">?</div><button onclick="playTargetSound()" class="bg-slate-700 hover:bg-slate-600 p-3 rounded-full transition"><i data-lucide="volume-2" class="w-6 h-6"></i></button></div><div id="coach-ui-training" class="w-full flex flex-col items-center"><div class="w-full h-4 bg-slate-700 rounded-full overflow-hidden mb-2 relative"><div class="absolute left-1/2 top-0 bottom-0 w-1 bg-white/30 -translate-x-1/2"></div><div id="game-feedback-bar" class="absolute top-0 bottom-0 bg-emerald-500 transition-all duration-100 opacity-0" style="left: 50%; width: 4px;"></div></div><div class="flex justify-between w-full text-xs text-slate-500 mb-8"><span>太低</span><span>準確</span><span>太高</span></div></div><div id="coach-ui-scoring" class="w-full hidden flex flex-col items-center mb-6"><div class="text-xl font-bold text-yellow-400 mb-2" id="scoring-status">準備中...</div><div class="w-full h-2 bg-slate-700 rounded-full overflow-hidden"><div id="scoring-progress" class="h-full bg-yellow-500 transition-all duration-1000" style="width: 0%"></div></div></div><div class="bg-slate-900/50 rounded-xl p-6 w-full text-center border border-slate-700/50"><div class="text-sm text-slate-400 mb-1">您的聲音</div><div class="text-4xl font-bold text-emerald-300 font-mono mb-2" id="game-user-hz">...</div><div class="h-8 text-xl font-bold" id="game-result-text"></div></div><div class="mt-8 flex gap-4"><button onclick="playTargetSound()" class="bg-slate-700 hover:bg-slate-600 px-6 py-3 rounded-lg font-bold text-slate-200">再聽一次</button><button onclick="nextCoachQuestion()" id="btn-next-q" class="bg-emerald-600 hover:bg-emerald-500 px-8 py-3 rounded-lg font-bold text-white shadow-lg">下一題</button></div></div></div></div>
+            <div id="tab-beats" class="tab-content hidden h-full flex flex-col p-4"><div class="flex justify-between items-center mb-4"><div class="flex items-center gap-4"><h2 class="text-2xl font-bold flex items-center gap-2"><i data-lucide="rss" class="text-pink-400"></i> 拍音實驗室 (Beat Frequency)</h2><button onclick="toggleModal('info-beat')" class="bg-slate-700 hover:bg-slate-600 px-3 py-1 rounded text-sm text-white flex items-center gap-1 border border-slate-600"><i data-lucide="book-open" class="w-4 h-4"></i> 說明</button></div><div class="flex items-center gap-2 bg-slate-800 p-1 rounded-lg border border-slate-700"><button onclick="toggleBeats()" id="beats-btn" class="bg-slate-700 hover:bg-pink-600 px-4 py-2 rounded text-sm font-bold transition-colors">播放</button></div></div><div id="info-beat" class="hidden fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" onclick="toggleModal('info-beat')"><div class="bg-slate-800 p-6 rounded-lg max-w-md w-full border border-slate-600 shadow-2xl" onclick="event.stopPropagation()"><div class="flex justify-between items-center mb-4"><h3 class="font-bold text-xl text-pink-400">物理原理：拍音 (Beats)</h3><button onclick="toggleModal('info-beat')"><i data-lucide="x"></i></button></div><p class="text-slate-300 text-sm leading-relaxed">當兩個頻率非常接近的聲波同時播放時，它們會發生干涉。</p><ul class="list-disc list-inside mt-2 text-slate-300 text-sm space-y-1"><li><strong>建設性干涉：</strong> 波峰相遇，聲音變大。</li><li><strong>破壞性干涉：</strong> 波峰遇波谷，聲音變小。</li></ul><div class="bg-slate-900 p-3 rounded mt-3 text-xs text-slate-400">拍頻 = |f1 - f2|</div></div></div><div class="flex-1 flex flex-col lg:flex-row gap-6"><div class="flex-1 bg-slate-800 rounded-xl relative overflow-hidden border border-slate-700 flex flex-col"><div class="absolute top-4 left-4 z-10 bg-black/50 px-3 py-1 rounded text-xs text-pink-300">疊加波形 (Interference)</div><canvas id="canvas-beats" class="w-full flex-1 bg-black"></canvas></div><div class="lg:w-80 bg-slate-800 p-6 rounded-xl border border-slate-700 flex flex-col gap-6"><div class="bg-slate-900 p-4 rounded-lg border border-slate-600"><h3 class="text-sm font-bold text-slate-300 mb-4">頻率設定</h3><div class="mb-6"><div class="flex justify-between text-xs text-blue-300 mb-1"><span>頻率 A (固定)</span><span class="font-mono font-bold">440 Hz</span></div><div class="w-full h-2 bg-blue-900/30 rounded relative"><div class="absolute left-1/2 top-0 bottom-0 w-1 bg-blue-500"></div></div></div><div><div class="flex justify-between text-xs text-pink-300 mb-1"><span>頻率 B (可調)</span><span class="font-mono font-bold" id="beat-f2-val">442 Hz</span></div><input type="range" id="beat-f2" min="430" max="450" step="0.5" value="442" class="w-full h-2 bg-slate-700 rounded appearance-none accent-pink-500" oninput="updateBeats()"><div class="flex justify-between text-[10px] text-slate-500 mt-1"><span>430</span><span>440 (同音)</span><span>450</span></div></div></div><div class="bg-slate-700/30 p-4 rounded-lg border border-slate-600/50"><div class="text-xs text-slate-400 uppercase tracking-widest mb-1">拍頻 (Beat Frequency)</div><div class="text-4xl font-black text-white font-mono mb-1" id="beat-freq-display">2.0 Hz</div><div class="text-xs text-slate-400">每秒聽到 <span id="beat-count" class="text-white font-bold">2</span> 次強弱變化</div></div></div></div></div>
+            <div id="tab-metronome" class="tab-content hidden h-full flex flex-col p-4"><div class="flex justify-between items-center mb-6"><h2 class="text-2xl font-bold flex items-center gap-2"><i data-lucide="clock" class="text-pink-400"></i> 節拍大師</h2></div><div class="flex-1 flex flex-col items-center justify-center gap-8"><div class="w-48 h-48 rounded-full bg-slate-800 border-8 border-slate-700 flex items-center justify-center shadow-2xl relative overflow-hidden"><div id="metro-light" class="w-32 h-32 rounded-full bg-slate-700 transition-colors duration-75"></div><div class="absolute inset-0 flex items-center justify-center pointer-events-none"><span class="text-5xl font-black text-white font-mono" id="metro-bpm-display">120</span></div></div><div class="w-full max-w-md bg-slate-800 p-6 rounded-xl border border-slate-700 flex flex-col gap-6"><div><div class="flex justify-between text-sm text-slate-400 mb-2"><span>速度 (BPM)</span><button onclick="tapTempo()" class="text-xs bg-slate-700 hover:bg-slate-600 px-2 py-1 rounded text-blue-300 border border-blue-900">TAP 測速</button></div><input type="range" id="metro-bpm" min="40" max="208" value="120" class="w-full h-3 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-pink-500" oninput="updateMetronomeParams()"><div class="flex justify-between text-xs text-slate-500 mt-1"><span>40 (Largo)</span><span>208 (Prestissimo)</span></div></div><div><label class="block text-sm text-slate-400 mb-2">節奏 / 拍號</label><div class="grid grid-cols-4 gap-2"><button onclick="setMetroSignature(4)" class="metro-sig-btn active bg-pink-600 text-white py-2 rounded font-bold text-sm border border-pink-700">4/4</button><button onclick="setMetroSignature(3)" class="metro-sig-btn bg-slate-700 text-slate-300 py-2 rounded font-bold text-sm border border-slate-600 hover:bg-slate-600">3/4</button><button onclick="setMetroSignature(2)" class="metro-sig-btn bg-slate-700 text-slate-300 py-2 rounded font-bold text-sm border border-slate-600 hover:bg-slate-600">2/4</button><button onclick="setMetroSignature(1)" class="metro-sig-btn bg-slate-700 text-slate-300 py-2 rounded font-bold text-sm border border-slate-600 hover:bg-slate-600">1/4</button></div></div><button onclick="toggleMetronome()" id="metro-play-btn" class="w-full py-4 rounded-lg bg-slate-200 hover:bg-white text-slate-900 font-black text-xl shadow-lg transition-transform active:scale-95 flex items-center justify-center gap-2"><i data-lucide="play"></i> 開始 (START)</button></div></div></div>
         </main>
     </div>
 
 <script>
-    lucide.createIcons();
+    // Global Variables
     let audioCtx;
-    function initAudio() {
-        if (!audioCtx) {
-            audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-        }
-        if (audioCtx.state === 'suspended') audioCtx.resume();
-    }
-    function toggleModal(id) { document.getElementById(id).classList.toggle('hidden'); }
+    let oscNode=null, oscGain=null, analyser=null, micStream=null, isMicActive=false, oscAnimId=null, isOscPaused=false, lastDrawTime=0, micMonitorGain=null;
+    let loudStream=null, loudAnim=null, maxDB=0;
+    let dopplerOsc=null, dopplerGain=null, dopCtx=null, sourcePos={x:0,y:0}, lastPos={x:0,y:0}, waves=[], isDragging=false, velocity={x:0,y:0}, dopAnimId=null;
+    let pulseAnimId=null, wavePulseX=-100;
+    let vOsc1=null, vOsc2=null, vGain=null, activeStringIdx=-1, fingerY=-1, tuneIdx=-1, startY=0, violinAnimId=null;
+    const stdViolin=[{name:'G3',base:196,tension:50,xOff:0.2,thick:4},{name:'D4',base:293.7,tension:50,xOff:0.4,thick:3},{name:'A4',base:440,tension:50,xOff:0.6,thick:2},{name:'E5',base:659.3,tension:50,xOff:0.8,thick:1}];
+    let vStrings=JSON.parse(JSON.stringify(stdViolin));
+    let recorderOsc=null, recorderGain=null;
+    let holes=[false,false,false,false,false,false,false,false];
+    let isRecorderBlowing = false;
+    let beatOsc1=null, beatOsc2=null, beatGain=null, beatCanvas=null;
+    let expertStream=null, expertAnim=null, pianoVol=0.5;
+    let coachStream=null, coachAnim=null, targetNoteFreq=0, targetNoteName="", isCoachActive=false;
+    let coachMode = 'training'; 
+    let scoringTimer = null;
+    let scoreSamples = [];
+    let lastOut = 0;
+    let isLifeSoundPlaying = false; 
+    let isMetroPlaying = false, metroTimer = null, metroNextNoteTime = 0.0, metroBeat = 0, metroBpm = 120, metroBeatsPerBar = 4, lastTapTime = 0;
 
-    // Note Helper
     const noteNames = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
     const solfegeNames = ['Do', 'Di', 'Re', 'Ri', 'Mi', 'Fa', 'Fi', 'Sol', 'Si', 'La', 'Li', 'Ti'];
-    
+
     function getNoteInfo(freq) {
-        if (!freq || freq < 20) return { note: '--', solfege: '--' };
+        if (!freq || freq < 20) return { note: '--', solfege: '--', cents: 0, diff: 0 };
         const n = 12 * Math.log2(freq / 440) + 69; 
         const midi = Math.round(n);
+        const diff = n - midi;
         const idx = midi % 12;
         const octave = Math.floor(midi / 12) - 1;
-        return {
-            note: noteNames[idx] + octave,
-            solfege: solfegeNames[idx]
+        return { 
+            note: noteNames[idx] + octave, 
+            solfege: solfegeNames[idx],
+            cents: diff * 100
         };
     }
 
-    // Autocorrelation for Pitch Detection
-    function autoCorrelate(buf, sampleRate) {
-        let SIZE = buf.length;
-        let rms = 0;
-        for (let i=0; i<SIZE; i++) {
-            let val = (buf[i] - 128) / 128.0;
-            rms += val*val;
-        }
-        rms = Math.sqrt(rms/SIZE);
-        if (rms < 0.02) return -1; // Signal too low
+    function initAudio() { if(!audioCtx) { audioCtx=new(window.AudioContext||window.webkitAudioContext)(); } if(audioCtx.state==='suspended') audioCtx.resume(); }
+    lucide.createIcons();
+    function toggleModal(id){ document.getElementById(id).classList.toggle('hidden'); }
 
-        // Find first dip
-        let r1=0, r2=SIZE-1, thres=0.2;
-        for (let i=0; i<SIZE/2; i++) if (Math.abs((buf[i]-128)/128.0) < thres) { r1=i; break; }
-        for (let i=1; i<SIZE/2; i++) if (Math.abs((buf[SIZE-i]-128)/128.0) < thres) { r2=SIZE-i; break; }
-
-        buf = buf.slice(r1, r2);
-        SIZE = buf.length;
-
-        let c = new Array(SIZE).fill(0);
-        for (let i=0; i<SIZE; i++) {
-            for (let j=0; j<SIZE-i; j++) {
-                let v1 = (buf[j]-128)/128.0;
-                let v2 = (buf[j+i]-128)/128.0;
-                c[i] = c[i] + v1*v2;
-            }
-        }
-
-        let d=0; while (c[d]>c[d+1]) d++;
-        let maxval=-1, maxpos=-1;
-        for (let i=d; i<SIZE; i++) {
-            if (c[i] > maxval) { maxval = c[i]; maxpos = i; }
-        }
-        
-        let T0 = maxpos;
-        return sampleRate/T0;
-    }
-
-    function switchTab(tabId) {
-        stopOscillator(); stopViolinSounds(); stopRecorder();
+    function switchTab(id) {
+        stopOscillator(); stopViolinSounds(); stopRecorder(); stopBeats(); stopMetronome();
         if(dopplerOsc) stopDopplerSound();
+        if(loudStream) toggleLoudnessMic();
+        if(expertStream) toggleTunerMode();
+        if(coachStream) stopCoachGame();
+        cancelAnimationFrame(pulseAnimId); cancelAnimationFrame(dopAnimId); cancelAnimationFrame(violinAnimId);
 
-        document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
-        document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active', 'bg-slate-700', 'text-white'));
-        
-        document.getElementById(`tab-${tabId}`).classList.remove('hidden');
-        document.getElementById(`btn-${tabId}`).classList.add('active');
-
-        if(tabId === 'wave-gen') resizeOscilloscope();
-        if(tabId === 'medium') initMedium();
-        if(tabId === 'doppler') initDoppler();
-        if(tabId === 'violin') initViolin();
-        if(tabId === 'wind') updateRecorderState();
+        document.querySelectorAll('.tab-content').forEach(e => e.classList.add('hidden'));
+        document.querySelectorAll('.tab-btn').forEach(e => e.classList.remove('active', 'bg-slate-700', 'text-white'));
+        document.getElementById(`tab-${id}`).classList.remove('hidden');
+        document.getElementById(`btn-${id}`).classList.add('active');
+        if(id==='wave-gen') resizeOscilloscope();
+        if(id==='medium') initMedium();
+        if(id==='doppler') initDoppler();
+        if(id==='violin') initViolin();
+        if(id==='wind') updateRecorderState();
+        if(id==='beats') initBeats();
+        if(id==='pitch-expert') initPiano();
     }
 
-    // ... [Other Shared Variables] ...
-    let oscNode = null, oscGain = null, analyser = null, micStream = null, isMicActive = false, oscAnimId = null, isOscPaused = false, lastDrawTime = 0;
-    
+    // Wave Gen + Pitch Detect
     function initOscNodes() { initAudio(); if (!analyser) { analyser = audioCtx.createAnalyser(); analyser.fftSize = 2048; } }
-    
-    function toggleOscillator() { initOscNodes(); const btn = document.getElementById('osc-toggle-btn'); if (oscNode) { stopOscillator(); btn.innerHTML = '<i data-lucide="play"></i> 播放聲音'; btn.classList.replace('bg-yellow-600', 'bg-blue-600'); } else { if(isMicActive) toggleMic(); oscNode = audioCtx.createOscillator(); oscGain = audioCtx.createGain(); updateOscillator(); oscNode.connect(oscGain); oscGain.connect(analyser); analyser.connect(audioCtx.destination); oscNode.start(); btn.innerHTML = '<i data-lucide="square"></i> 停止聲音'; btn.classList.replace('bg-blue-600', 'bg-yellow-600'); drawOscilloscope(); } lucide.createIcons(); }
-    
-    function stopOscillator() { if (oscNode) { oscNode.stop(); oscNode.disconnect(); oscNode = null; } if (!isMicActive && !isOscPaused) cancelAnimationFrame(oscAnimId); }
-    function togglePauseOsc() { isOscPaused = !isOscPaused; const btn = document.getElementById('btn-pause-osc'); btn.classList.toggle('bg-blue-600', isOscPaused); if(!isOscPaused) drawOscilloscope(); }
-    
-    async function toggleMic() { 
+    function toggleOscillator() { 
         initOscNodes(); 
-        if (isMicActive) { 
-            if (micStream) micStream.getTracks().forEach(t => t.stop()); 
-            isMicActive = false; 
-            document.getElementById('mic-toggle-btn').classList.remove('bg-red-600', 'text-white');
-            document.getElementById('detect-msg').innerText = '(請開啟麥克風以開始偵測)';
-            cancelAnimationFrame(oscAnimId); 
-        } else { 
-            if (oscNode) toggleOscillator(); 
-            try { 
-                if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-                    throw new Error("瀏覽器不支援或環境不允許 (如 HTTP 或 iframe 限制)");
-                }
-                micStream = await navigator.mediaDevices.getUserMedia({ audio: true }); 
-                const src = audioCtx.createMediaStreamSource(micStream); 
-                src.connect(analyser); 
-                isMicActive = true; 
-                document.getElementById('mic-toggle-btn').classList.add('bg-red-600', 'text-white');
-                document.getElementById('detect-msg').innerText = '正在偵測...';
-                drawOscilloscope(); 
-            } catch(e) { 
-                console.error(e);
-                alert("無法啟動麥克風。\n\n常見原因：\n1. 嵌入環境限制：Google Sites 等平台的嵌入框 (iframe) 通常會封鎖麥克風權限。\n2. 權限拒絕：您可能拒絕了瀏覽器的麥克風請求。\n3. 系統設定：作業系統未允許瀏覽器存取麥克風。\n\n解決建議：\n請不要直接在 Google Sites 嵌入此頁面，改為將此 HTML 檔案下載到電腦直接開啟，或部署到其他空間後以「新分頁」開啟連結。"); 
-            } 
+        const btn = document.getElementById('osc-toggle-btn');
+        
+        // Check Play/Pause Logic
+        // If running & not paused -> Pause (Freeze)
+        // If running & paused -> Resume (Play)
+        // If stopped -> Start (Play)
+        
+        if (oscNode) { 
+             // Already running
+             if(isOscPaused) {
+                 // Resume
+                 togglePauseOsc(); // Un-pauses
+                 btn.innerHTML = '<i data-lucide="pause"></i> 暫停 (Freeze)';
+                 // Keep color blue/green?
+             } else {
+                 // Pause
+                 togglePauseOsc(); // Pauses
+                 btn.innerHTML = '<i data-lucide="play"></i> 播放 (Play)';
+             }
+        } else {
+             // Start new
+             if(isMicActive) toggleMic(); 
+             oscNode=audioCtx.createOscillator(); oscGain=audioCtx.createGain(); updateOscillator(); oscNode.connect(oscGain); oscGain.connect(analyser); analyser.connect(audioCtx.destination); oscNode.start(); 
+             // Default state: Playing
+             isOscPaused = false;
+             btn.innerHTML = '<i data-lucide="pause"></i> 暫停 (Freeze)';
+             drawOscilloscope(); 
         } 
+        lucide.createIcons(); 
     }
     
-    function updateOscillator() { const freq = parseFloat(document.getElementById('osc-freq').value); const vol = parseFloat(document.getElementById('osc-vol').value); const type = document.getElementById('osc-type').value; document.getElementById('osc-freq-input').value = freq; document.getElementById('osc-vol-val').innerText = Math.round(vol * 100) + '%'; const warning = document.getElementById('high-freq-warning'); if (freq > 2000) warning.classList.remove('hidden'); else warning.classList.add('hidden'); if (oscNode) { oscNode.frequency.setTargetAtTime(freq, audioCtx.currentTime, 0.05); oscNode.type = type; oscGain.gain.setTargetAtTime(vol, audioCtx.currentTime, 0.05); } }
-    function updateOscillatorFromInput() { document.getElementById('osc-freq').value = document.getElementById('osc-freq-input').value; updateOscillator(); }
-    function setFreq(v) { document.getElementById('osc-freq').value = v; updateOscillator(); }
-    function setWaveType(t) { document.querySelectorAll('.wave-btn').forEach(b => b.classList.remove('active', 'bg-blue-600', 'text-white')); document.querySelector(`.wave-btn[data-type="${t}"]`).classList.add('active', 'bg-blue-600', 'text-white'); document.getElementById('osc-type').value = t; updateOscillator(); }
-    document.write('<input type="hidden" id="osc-type" value="sine">');
-    
-    function drawOscilloscope() { 
-        if(isOscPaused) return; 
-        const canvas = document.getElementById('canvas-oscilloscope'); 
-        const ctx = canvas.getContext('2d'); 
-        const bufferLength = analyser.frequencyBinCount; 
-        const dataArray = new Uint8Array(bufferLength); 
+    // Helper for pause button
+    function togglePauseOsc() { 
+        isOscPaused = !isOscPaused; 
+        const btn = document.getElementById('btn-pause-osc'); // The small secondary button if it exists
+        if(btn) btn.classList.toggle('bg-blue-600',isOscPaused); 
+        if(!isOscPaused) drawOscilloscope(); 
         
-        if(canvas.width !== canvas.parentElement.clientWidth) { canvas.width = canvas.parentElement.clientWidth; canvas.height = canvas.parentElement.clientHeight; } 
-        
-        function draw(time) { 
-            if(isOscPaused) return; 
-            oscAnimId = requestAnimationFrame(draw); 
-            if(time - lastDrawTime < 20) return; 
-            lastDrawTime = time; 
-            
-            analyser.getByteTimeDomainData(dataArray); 
-            
-            // Pitch Detection Logic
-            if (isMicActive) {
-                const pitch = autoCorrelate(dataArray, audioCtx.sampleRate);
-                if (pitch !== -1 && pitch > 50 && pitch < 5000) {
-                    document.getElementById('detect-hz').innerText = Math.round(pitch) + ' Hz';
-                    const info = getNoteInfo(pitch);
-                    document.getElementById('detect-note').innerText = info.note;
-                    document.getElementById('detect-solfege').innerText = info.solfege;
-                    document.getElementById('detect-msg').innerText = '偵測中';
-                } else {
-                    document.getElementById('detect-msg').innerText = '訊號微弱';
-                }
+        // Mute/Unmute Audio Logic for "Pause"
+        if(oscGain) {
+            if(isOscPaused) oscGain.gain.setTargetAtTime(0, audioCtx.currentTime, 0.01); // Mute
+            else {
+                const v = parseFloat(document.getElementById('osc-vol').value);
+                oscGain.gain.setTargetAtTime(v, audioCtx.currentTime, 0.01); // Unmute
             }
-
-            let sum=0; 
-            for(let i=0; i<bufferLength; i++) sum += Math.pow((dataArray[i]-128)/128, 2); 
-            document.getElementById('osc-rms-val').innerText = Math.sqrt(sum/bufferLength).toFixed(3); 
-            
-            ctx.fillStyle = '#000'; ctx.fillRect(0,0,canvas.width,canvas.height); 
-            ctx.lineWidth = 3; ctx.strokeStyle = '#38bdf8'; ctx.beginPath(); 
-            
-            let trigger = 0; 
-            for(let i=0; i<bufferLength/2; i++) { if(dataArray[i] < 128 && dataArray[i+1] >= 128) { trigger = i; break; } } 
-            
-            const sliceW = canvas.width / (bufferLength/2); 
-            let x=0; 
-            for(let i=trigger; i<bufferLength; i++) { 
-                const y = (dataArray[i]/128.0) * (canvas.height/2); 
-                if(i===trigger) ctx.moveTo(x,y); else ctx.lineTo(x,y); 
-                x+=sliceW; if(x>canvas.width) break; 
-            } 
-            ctx.stroke(); 
-        } 
-        draw(performance.now()); 
+        }
     }
-    function resizeOscilloscope() { const c=document.getElementById('canvas-oscilloscope'); if(c) { c.width=c.parentElement.clientWidth; c.height=c.parentElement.clientHeight; } }
+
+    function stopOscillator() { if(oscNode){oscNode.stop(); oscNode.disconnect(); oscNode=null; analyser.disconnect();} if(!isMicActive&&!isOscPaused)cancelAnimationFrame(oscAnimId); }
+    async function toggleMic() { initOscNodes(); if(isMicActive){ if(micStream)micStream.getTracks().forEach(t=>t.stop()); isMicActive=false; document.getElementById('mic-toggle-btn').classList.remove('bg-red-600','text-white'); if(micMonitorGain){micMonitorGain.disconnect(); micMonitorGain=null;} analyser.disconnect(); cancelAnimationFrame(oscAnimId); }else{ if(oscNode)toggleOscillator(); try{ micStream=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:true,noiseSuppression:true}}); const src=audioCtx.createMediaStreamSource(micStream); src.connect(analyser); micMonitorGain=audioCtx.createGain(); micMonitorGain.gain.value=0; analyser.connect(micMonitorGain); micMonitorGain.connect(audioCtx.destination); updateMonitorIcon(); isMicActive=true; document.getElementById('mic-toggle-btn').classList.add('bg-red-600','text-white'); drawOscilloscope(); }catch(e){alert("無法啟動麥克風");} } }
+    function toggleMicMonitor() { if(!isMicActive||!micMonitorGain)return; micMonitorGain.gain.value=micMonitorGain.gain.value>0?0:1; updateMonitorIcon(); }
+    function updateMonitorIcon() { const btn=document.getElementById('mic-monitor-btn'); if(micMonitorGain&&micMonitorGain.gain.value>0){btn.innerHTML='<i data-lucide="volume-2"></i>'; btn.classList.add('text-green-400');}else{btn.innerHTML='<i data-lucide="volume-x"></i>'; btn.classList.remove('text-green-400');} lucide.createIcons(); }
+    function updateOscillator() { const f=parseFloat(document.getElementById('osc-freq').value); const ve=document.getElementById('osc-vol'); const v=ve?parseFloat(ve.value):0.5; document.getElementById('osc-freq-input').value=f; const w=document.getElementById('high-freq-warning'); if(w)w.classList.toggle('hidden', f<=2000); if(oscNode){oscNode.frequency.setTargetAtTime(f,audioCtx.currentTime,0.05); if(oscGain && !isOscPaused)oscGain.gain.setTargetAtTime(v,audioCtx.currentTime,0.05);} }
+    function updateOscillatorFromInput() { document.getElementById('osc-freq').value=document.getElementById('osc-freq-input').value; updateOscillator(); }
+    function setFreq(v){document.getElementById('osc-freq').value=v; updateOscillator();}
+    function setWaveType(t){document.querySelectorAll('.wave-btn').forEach(b=>b.classList.remove('active','bg-blue-600')); event.currentTarget.classList.add('active','bg-blue-600'); if(oscNode)oscNode.type=t; document.getElementById('osc-type').value=t;}
+    document.write('<input type="hidden" id="osc-type" value="sine">');
+    function updateWaveGate(v) { document.getElementById('wave-gate-val').innerText=v+' dB'; }
+    function drawOscilloscope() {
+        if(isOscPaused)return; oscAnimId=requestAnimationFrame(drawOscilloscope);
+        const buf=new Uint8Array(analyser.frequencyBinCount); analyser.getByteTimeDomainData(buf);
+        const cvs=document.getElementById('canvas-oscilloscope'), ctx=cvs.getContext('2d');
+        if(cvs.width!==cvs.parentElement.clientWidth) { cvs.width=cvs.parentElement.clientWidth; cvs.height=cvs.parentElement.clientHeight; }
+        ctx.fillStyle='#000'; ctx.fillRect(0,0,cvs.width,cvs.height); ctx.lineWidth=3; ctx.strokeStyle='#38bdf8'; ctx.beginPath();
+        if(isMicActive) {
+            const f = autoCorrelate(buf, audioCtx.sampleRate);
+            if(f>50&&f<5000) {
+                const i=getNoteInfo(f); document.getElementById('detect-hz').innerText=Math.round(f)+' Hz';
+                document.getElementById('detect-note').innerText=i.note; document.getElementById('detect-solfege').innerText=i.solfege;
+                document.getElementById('detect-msg').innerText="偵測中";
+            } else document.getElementById('detect-msg').innerText="訊號微弱";
+        }
+        let trigger=0; for(let i=0;i<buf.length-1;i++) if(buf[i]<128&&buf[i+1]>=128){trigger=i;break;}
+        const slice=cvs.width/(buf.length/2); let x=0;
+        for(let i=trigger;i<buf.length;i++){ const y=(buf[i]/128.0)*cvs.height/2; if(i===trigger)ctx.moveTo(x,y);else ctx.lineTo(x,y); x+=slice; if(x>cvs.width)break; } ctx.stroke();
+    }
+    function resizeOscilloscope(){const c=document.getElementById('canvas-oscilloscope'); if(c){c.width=c.parentElement.clientWidth; c.height=c.parentElement.clientHeight;}}
+    function autoCorrelate(buf, sr) {
+        let rms=0; for(let i=0;i<buf.length;i++) rms+=(buf[i]-128)/128*(buf[i]-128)/128;
+        const db=20*Math.log10(Math.sqrt(rms/buf.length))+100;
+        const gate=parseInt(document.getElementById('wave-noise-gate')?.value||30);
+        if(db<gate) return -1;
+        let r1=0,r2=buf.length-1; for(let i=0;i<buf.length/2;i++) if(Math.abs((buf[i]-128)/128)<0.2){r1=i;break;}
+        for(let i=1;i<buf.length/2;i++) if(Math.abs((buf[buf.length-i]-128)/128)<0.2){r2=buf.length-i;break;}
+        const b2=buf.slice(r1,r2); const sz=b2.length; let c=new Array(sz).fill(0);
+        for(let i=0;i<sz;i++) for(let j=0;j<sz-i;j++) c[i]+=( (b2[j]-128)/128 * (b2[j+i]-128)/128 );
+        let d=0; while(c[d]>c[d+1])d++; let mx=-1, mp=-1;
+        for(let i=d;i<sz;i++) if(c[i]>mx){mx=c[i]; mp=i;}
+        return sr/mp;
+    }
+
+    function initLoudness() { initAudio(); if(!analyser) { analyser=audioCtx.createAnalyser(); analyser.fftSize=2048; } }
+    async function toggleLoudnessMic() { initLoudness(); const btn=document.getElementById('loudness-mic-btn'); if(loudStream){loudStream.getTracks().forEach(t=>t.stop()); loudStream=null; btn.classList.replace('bg-green-600','bg-red-600'); btn.innerText='啟動分貝計'; cancelAnimationFrame(loudAnim);}else{try{loudStream=await navigator.mediaDevices.getUserMedia({audio:true}); const s=audioCtx.createMediaStreamSource(loudStream); s.connect(analyser); btn.classList.replace('bg-red-600','bg-green-600'); btn.innerText='停止'; drawLoudness();}catch(e){alert("Mic Error");}} }
+    function drawLoudness() { loudAnim=requestAnimationFrame(drawLoudness); const buf=new Uint8Array(analyser.frequencyBinCount); analyser.getByteTimeDomainData(buf); let sum=0; for(let x of buf) sum+=((x-128)/128)**2; let db=20*Math.log10(Math.sqrt(sum/buf.length))+100; const gate=parseInt(document.getElementById('noise-gate').value); if(db<gate)db=0; document.getElementById('db-display').innerText=Math.round(db); document.getElementById('db-bar').style.height=Math.min(100, db/1.2)+'%'; if(db>maxDB){maxDB=db; document.getElementById('db-max').innerText=Math.round(db)+' dB';} }
+    function initMedium(){ updateTemperature(); ['solid','liquid','gas'].forEach(t=>{const c=document.getElementById(`canvas-${t}`); if(c){c.width=c.parentElement.clientWidth; c.height=c.parentElement.clientHeight;}}); cancelAnimationFrame(pulseAnimId); animateMedium(); }
+    function updateTemperature() { const t = parseInt(document.getElementById('temp-slider').value); document.getElementById('temp-display').innerText = t+'°C'; }
+    function animateMedium() {
+        ['solid','liquid','gas'].forEach(type => {
+            const cvs = document.getElementById(`canvas-${type}`); if(!cvs)return; const ctx=cvs.getContext('2d');
+            const tVal=parseInt(document.getElementById('temp-slider').value); ctx.clearRect(0,0,cvs.width,cvs.height);
+            const count=type==='solid'?150:type==='liquid'?60:20; const color=type==='solid'?'#a855f7':type==='liquid'?'#3b82f6':'#22c55e'; const time=Date.now()/1000; ctx.fillStyle=color;
+            for(let i=0; i<count; i++) {
+                let x=(Math.sin(i*123.4)*0.5+0.5)*cvs.width; let y=(Math.cos(i*321.5)*0.5+0.5)*cvs.height;
+                const wiggle=(tVal+40)*0.02*(type==='gas'?2:0.5); x+=Math.sin(time*5+i)*wiggle; y+=Math.cos(time*5+i)*wiggle;
+                const vx=wavePulseX*(type==='solid'?15:type==='liquid'?8:3)*(1+tVal/300);
+                let r=type==='gas'?4:3; if(wavePulseX>0&&Math.abs(x-vx)<20){r*=1.5;ctx.fillStyle='#fff';}else ctx.fillStyle=color;
+                ctx.beginPath(); ctx.arc(x,y,r,0,Math.PI*2); ctx.fill();
+                if(i===0&&wavePulseX>0&&vx<cvs.width){ctx.save(); ctx.strokeStyle='rgba(255,255,255,0.3)'; ctx.lineWidth=3; ctx.beginPath(); ctx.moveTo(vx,0); ctx.lineTo(vx,cvs.height); ctx.stroke(); ctx.restore();}
+            }
+        });
+        if(wavePulseX>-100){wavePulseX+=2; if(wavePulseX*3>2000)wavePulseX=-100;} pulseAnimId=requestAnimationFrame(animateMedium);
+    }
+    function triggerPulse(){wavePulseX=0; initAudio(); const o=audioCtx.createOscillator(), g=audioCtx.createGain(); o.frequency.value=100; o.frequency.exponentialRampToValueAtTime(0.01,audioCtx.currentTime+0.2); g.gain.value=0.5; g.gain.exponentialRampToValueAtTime(0.001,audioCtx.currentTime+0.2); o.connect(g); g.connect(audioCtx.destination); o.start(); o.stop(audioCtx.currentTime+0.2);}
+    function initDoppler(){const c=document.getElementById('canvas-doppler'); c.width=c.parentElement.clientWidth; c.height=c.parentElement.clientHeight; dopCtx=c.getContext('2d'); sourcePos={x:50,y:c.height/2}; lastPos={...sourcePos}; c.onmousedown=e=>{isDragging=true; sourcePos.x=e.offsetX; sourcePos.y=e.offsetY;}; c.onmousemove=e=>{if(isDragging){sourcePos.x=e.offsetX; sourcePos.y=e.offsetY;}}; window.onmouseup=()=>{isDragging=false; velocity={x:0,y:0};}; cancelAnimationFrame(dopAnimId); animateDoppler();}
+    function resetDoppler(){sourcePos.x=50; velocity={x:0,y:0};}
+    function toggleDopplerSound(){if(document.getElementById('doppler-sound-toggle').checked)startDopplerSound(); else stopDopplerSound();}
+    function startDopplerSound(){initAudio(); if(dopplerOsc)return; dopplerOsc=audioCtx.createOscillator(); dopplerGain=audioCtx.createGain(); dopplerOsc.type='sawtooth'; dopplerOsc.frequency.value=440; const f=audioCtx.createBiquadFilter(); f.type='lowpass'; f.frequency.value=1000; dopplerOsc.connect(f); f.connect(dopplerGain); dopplerGain.connect(audioCtx.destination); dopplerOsc.start(); dopplerGain.gain.setValueAtTime(0.1, audioCtx.currentTime);}
+    function stopDopplerSound(){if(dopplerOsc){dopplerGain.gain.exponentialRampToValueAtTime(0.001,audioCtx.currentTime+0.1); dopplerOsc.stop(audioCtx.currentTime+0.1); setTimeout(()=>{dopplerOsc=null;},100);}}
+    function animateDoppler(){if(!dopCtx)return; dopAnimId=requestAnimationFrame(animateDoppler); dopCtx.fillStyle='#1e293b'; dopCtx.fillRect(0,0,dopCtx.canvas.width,dopCtx.canvas.height); const dx=sourcePos.x-lastPos.x, dy=sourcePos.y-lastPos.y; velocity.x=velocity.x*0.9+dx*0.1; velocity.y=velocity.y*0.9+dy*0.1; lastPos={...sourcePos}; if(Date.now()%20===0)waves.push({x:sourcePos.x,y:sourcePos.y,r:0}); dopCtx.lineWidth=2; for(let i=waves.length-1; i>=0; i--){let w=waves[i]; w.r+=1; const a=Math.max(0,1-w.r/400); dopCtx.strokeStyle=`rgba(56,189,248,${a})`; dopCtx.beginPath(); dopCtx.arc(w.x,w.y,w.r,0,Math.PI*2); dopCtx.stroke(); if(w.r>400)waves.splice(i,1);} dopCtx.fillStyle='#3b82f6'; dopCtx.beginPath(); dopCtx.arc(sourcePos.x,sourcePos.y,8,0,Math.PI*2); dopCtx.fill(); const cx=dopCtx.canvas.width/2, cy=dopCtx.canvas.height/2, vx=cx-sourcePos.x, vy=cy-sourcePos.y, d=Math.sqrt(vx*vx+vy*vy), sp=(velocity.x*(vx/(d||1))+velocity.y*(vy/(d||1))), f=Math.max(100,Math.min(1000,440*(1+sp*0.08))); document.getElementById('doppler-obs-hz').innerText=Math.round(f); if(dopplerOsc)dopplerOsc.frequency.setTargetAtTime(f,audioCtx.currentTime,0.1);}
+    function initViolin(){const c=document.getElementById('canvas-violin'); c.width=c.parentElement.clientWidth; c.height=c.parentElement.clientHeight; c.onmousedown=e=>{const r=c.getBoundingClientRect(); fingerY=e.clientY-r.top; const cx=e.clientX-r.left; let md=999; vStrings.forEach((s,i)=>{const d=Math.abs(cx-c.width*s.xOff); if(d<md){md=d; activeStringIdx=i;}}); document.getElementById('finger-indicator').style.display='block'; document.getElementById('finger-indicator').style.top=fingerY+'px'; playViolinNote();}; c.onmousemove=e=>{if(fingerY!==-1){const r=c.getBoundingClientRect(); fingerY=e.clientY-r.top; document.getElementById('finger-indicator').style.top=fingerY+'px'; updateViolinFreq();}}; window.onmouseup=()=>{fingerY=-1; document.getElementById('finger-indicator').style.display='none'; stopViolinSounds(); activeStringIdx=-1;}; cancelAnimationFrame(violinAnimId); drawViolin();}
+    function getViolinFreq(i){const s=vStrings[i], tf=1+(s.tension-50)*0.01; let lf=1; if(fingerY!==-1){const c=document.getElementById('canvas-violin'); lf=(c.height*1.5)/(c.height*1.5-fingerY);} return s.base*tf*lf;}
+    function playViolinNote(){
+        initAudio(); if(activeStringIdx===-1)return; 
+        vGain = audioCtx.createGain(); 
+        vOsc1 = audioCtx.createOscillator(); vOsc1.type='sawtooth';
+        vOsc2 = audioCtx.createOscillator(); vOsc2.type='sawtooth';
+        const bandpass = audioCtx.createBiquadFilter(); bandpass.type = 'bandpass'; bandpass.frequency.value = 500; bandpass.Q.value = 0.5;
+        const highshelf = audioCtx.createBiquadFilter(); highshelf.type = 'highshelf'; highshelf.frequency.value = 2000; highshelf.gain.value = -10; 
+        vOsc1.connect(bandpass); vOsc2.connect(bandpass); bandpass.connect(highshelf); highshelf.connect(vGain); vGain.connect(audioCtx.destination);
+        const now = audioCtx.currentTime;
+        vOsc1.start(now); vOsc2.start(now);
+        vGain.gain.setValueAtTime(0, now); vGain.gain.linearRampToValueAtTime(0.3, now + 0.1); 
+        updateViolinFreq();
+    }
+    function updateViolinFreq(){if(activeStringIdx!==-1){const f=getViolinFreq(activeStringIdx); const i=getNoteInfo(f); document.getElementById('violin-hz').innerText=Math.round(f)+' Hz'; document.getElementById('violin-note-name').innerText=i.note; document.getElementById('violin-solfege').innerText=i.solfege; if(vOsc1 && vOsc2){vOsc1.frequency.setTargetAtTime(f, audioCtx.currentTime, 0.05); vOsc2.frequency.setTargetAtTime(f+2, audioCtx.currentTime, 0.05);}}}
+    function stopViolinSounds(){if(vOsc1){const now=audioCtx.currentTime; vGain.gain.cancelScheduledValues(now); vGain.gain.linearRampToValueAtTime(0,now+0.1); vOsc1.stop(now+0.1); vOsc2.stop(now+0.1); setTimeout(()=>{vOsc1=null;vOsc2=null;},100);}}
+    function drawViolin(){violinAnimId=requestAnimationFrame(drawViolin); const c=document.getElementById('canvas-violin'); if(!c)return; const ctx=c.getContext('2d'); ctx.clearRect(0,0,c.width,c.height); vStrings.forEach((s,i)=>{const x=c.width*s.xOff; let off=0; if(activeStringIdx===i&&fingerY!==-1)off=(Math.random()-0.5)*2; ctx.fillStyle='#999'; ctx.fillRect(x+off,0,s.thick,c.height);});}
+    window.startTuning=function(i){tuneIdx=i; document.body.style.cursor='ns-resize'; startY=window.event.clientY; window.addEventListener('mousemove',onTuneMove); window.addEventListener('mouseup',onTuneUp);}
+    function onTuneMove(e){const dy=startY-e.clientY; vStrings[tuneIdx].tension+=dy*0.5; startY=e.clientY; if(activeStringIdx===tuneIdx)updateViolinFreq(); const p=document.getElementById(`peg-${tuneIdx}`); let r=parseFloat(p.style.transform.replace(/[^\d.-]/g,''))||0; p.style.transform=`rotate(${r+dy}deg)`;}
+    function onTuneUp(){document.body.style.cursor='default'; window.removeEventListener('mousemove',onTuneMove); window.removeEventListener('mouseup',onTuneUp);}
+    function resetViolin(){vStrings=JSON.parse(JSON.stringify(stdViolin)); [0,1,2,3].forEach(i=>document.getElementById(`peg-${i}`).style.transform=`rotate(${i%2==0?45:-45}deg)`);}
+    function toggleRecorderHole(i){holes[i]=!holes[i]; const els=document.querySelectorAll(`#hole-${i}, #hole-${i}a, #hole-${i}b`); els.forEach(el=>{if(holes[i])el.classList.add('closed');else el.classList.remove('closed');}); if(isRecorderBlowing)updateRecorderState(); else {let firstOpen=8; for(let k=0;k<8;k++){if(holes[k]===false){firstOpen=k;break;}} const pct=10+(firstOpen/8)*90; document.getElementById('air-column').style.height=pct+'%';}}
+    function updateRecorderState(){if(!isRecorderBlowing)return; let firstOpen=8; for(let i=0;i<8;i++){if(holes[i]===false){firstOpen=i;break;}} const freqs=[1174,1046,987,880,783,698,659,587,523]; const f=freqs[firstOpen]; const i=getNoteInfo(f); document.getElementById('recorder-hz').innerText=f+' Hz'; document.getElementById('recorder-note-name').innerText=i.note; document.getElementById('recorder-solfege').innerText=i.solfege; const pct=10+(firstOpen/8)*90; document.getElementById('air-column').style.height=pct+'%'; if(recorderOsc)recorderOsc.frequency.setTargetAtTime(f,audioCtx.currentTime,0.05);}
+    function toggleRecorderState(){isRecorderBlowing=!isRecorderBlowing; const btn=document.getElementById('recorder-btn'); const txt=document.getElementById('recorder-btn-text'); if(isRecorderBlowing){playRecorder(); btn.classList.add('blowing-active','bg-blue-500'); btn.classList.remove('bg-amber-900'); txt.innerHTML="吹氣中...";}else{stopRecorder(); btn.classList.remove('blowing-active','bg-blue-500'); btn.classList.add('bg-amber-900'); txt.innerHTML="點擊<br>吹氣"; document.getElementById('recorder-hz').innerText="--"; let firstOpen=8; for(let k=0;k<8;k++){if(holes[k]===false){firstOpen=k;break;}} const pct=10+(firstOpen/8)*90; document.getElementById('air-column').style.height=pct+'%';}}
+    function playRecorder(){initAudio(); if(recorderOsc)return; recorderOsc=audioCtx.createOscillator(); recorderGain=audioCtx.createGain(); recorderOsc.type='triangle'; const filter=audioCtx.createBiquadFilter(); filter.type='lowpass'; filter.frequency.value=2000; recorderOsc.connect(filter); filter.connect(recorderGain); recorderGain.connect(audioCtx.destination); recorderOsc.start(); recorderGain.gain.setValueAtTime(0,audioCtx.currentTime); recorderGain.gain.linearRampToValueAtTime(0.5,audioCtx.currentTime+0.1); updateRecorderState();}
+    function stopRecorder(){if(recorderOsc){recorderGain.gain.linearRampToValueAtTime(0,audioCtx.currentTime+0.1); recorderOsc.stop(audioCtx.currentTime+0.1); setTimeout(()=>{recorderOsc=null;recorderGain=null;},100);}}
     
-    // [Other Tabs: Medium, Doppler, Violin, Wind - Same logic as v3.3]
-    let pulseAnimId, wavePulseX=-100; function updateTemperature() { const t = parseInt(document.getElementById('temp-slider').value); document.getElementById('temp-display').innerText = t+'°C'; document.getElementById('speed-gas').innerText = Math.round(331.3 + 0.606*t); document.getElementById('speed-liquid').innerText = Math.round(1402 + t*4 - 0.03*t*t); document.getElementById('speed-solid').innerText = Math.round(5000 - 0.4*t); } function initMedium() { updateTemperature(); ['solid','liquid','gas'].forEach(t => { const c=document.getElementById(`canvas-${t}`); c.width=c.parentElement.clientWidth; c.height=c.parentElement.clientHeight; }); cancelAnimationFrame(pulseAnimId); animateMedium(); } function animateMedium() { ['solid','liquid','gas'].forEach(type => { const cvs = document.getElementById(`canvas-${type}`); const ctx = cvs.getContext('2d'); const speed = parseInt(document.getElementById(`speed-${type}`).innerText); ctx.clearRect(0,0,cvs.width, cvs.height); const count = type==='solid'?150 : type==='liquid'?60 : 20; const color = type==='solid'?'#a855f7' : type==='liquid'?'#3b82f6' : '#22c55e'; const t = Date.now()/1000; ctx.fillStyle = color; for(let i=0; i<count; i++) { let x = (Math.sin(i*123)*0.5+0.5)*cvs.width; let y = (Math.cos(i*321)*0.5+0.5)*cvs.height; const wiggle = (parseInt(document.getElementById('temp-slider').value)+40)*0.03 * (type==='gas'?2:0.5); x += Math.sin(t*3+i)*wiggle; y+=Math.cos(t*3+i)*wiggle; const visualX = wavePulseX * (speed/343); let r = type==='gas'?4:3; if(wavePulseX > 0 && Math.abs(x-visualX)<20) { r*=1.5; ctx.fillStyle='#fff'; } else ctx.fillStyle=color; ctx.beginPath(); ctx.arc(x,y,r,0,Math.PI*2); ctx.fill(); if(i===0 && wavePulseX>0 && visualX<cvs.width) { ctx.save(); ctx.strokeStyle='rgba(255,255,255,0.3)'; ctx.lineWidth=3; ctx.beginPath(); ctx.moveTo(visualX,0); ctx.lineTo(visualX,cvs.height); ctx.stroke(); ctx.restore(); } } }); if(wavePulseX>-100) { wavePulseX += 3; if(wavePulseX > 1500) wavePulseX = -100; } pulseAnimId = requestAnimationFrame(animateMedium); } function triggerPulse() { wavePulseX = 0; initAudio(); const o=audioCtx.createOscillator(); const g=audioCtx.createGain(); o.frequency.value=100; o.frequency.exponentialRampToValueAtTime(0.01,audioCtx.currentTime+0.2); g.gain.value=0.5; g.gain.exponentialRampToValueAtTime(0.001,audioCtx.currentTime+0.2); o.connect(g); g.connect(audioCtx.destination); o.start(); o.stop(audioCtx.currentTime+0.2); }
-    let dopCtx, sourcePos={x:0,y:0}, lastPos={x:0,y:0}, waves=[], isDragging=false; let velocity={x:0,y:0}, dopplerOsc=null, dopplerGain=null; function initDoppler() { const c=document.getElementById('canvas-doppler'); dopCtx=c.getContext('2d'); c.width=c.parentElement.clientWidth; c.height=c.parentElement.clientHeight; sourcePos={x:50, y:c.height/2}; lastPos={...sourcePos}; c.addEventListener('mousedown',e=>{ isDragging=true; updateDopplerPos(e); }); c.addEventListener('mousemove',e=>{ if(isDragging) updateDopplerPos(e); }); window.addEventListener('mouseup',()=>{ isDragging=false; velocity={x:0,y:0}; }); if(document.getElementById('doppler-sound-toggle').checked) startDopplerSound(); animateDoppler(); } function updateDopplerPos(e) { const r=document.getElementById('canvas-doppler').getBoundingClientRect(); sourcePos.x=e.clientX-r.left; sourcePos.y=e.clientY-r.top; } function resetDoppler() { sourcePos.x=50; velocity={x:0,y:0}; } function toggleDopplerSound() { if(document.getElementById('doppler-sound-toggle').checked) startDopplerSound(); else stopDopplerSound(); } function startDopplerSound() { initAudio(); if(dopplerOsc) return; dopplerOsc=audioCtx.createOscillator(); dopplerGain=audioCtx.createGain(); dopplerOsc.type='sawtooth'; dopplerOsc.frequency.value=440; const f=audioCtx.createBiquadFilter(); f.type='lowpass'; f.frequency.value=1000; dopplerOsc.connect(f); f.connect(dopplerGain); dopplerGain.connect(audioCtx.destination); dopplerOsc.start(); dopplerGain.gain.setValueAtTime(0.1, audioCtx.currentTime); } function stopDopplerSound() { if(dopplerOsc) { dopplerGain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime+0.1); dopplerOsc.stop(audioCtx.currentTime+0.1); setTimeout(()=>{dopplerOsc=null;},100); } } function animateDoppler() { dopCtx.fillStyle='#1e293b'; dopCtx.fillRect(0,0,dopCtx.canvas.width,dopCtx.canvas.height); const dx=sourcePos.x-lastPos.x; const dy=sourcePos.y-lastPos.y; velocity.x = velocity.x*0.9 + dx*0.1; velocity.y = velocity.y*0.9 + dy*0.1; lastPos={...sourcePos}; if(Date.now()%30===0) waves.push({x:sourcePos.x, y:sourcePos.y, r:0}); dopCtx.lineWidth=2; for(let i=waves.length-1; i>=0; i--) { let w=waves[i]; w.r+=0.8; const alpha=Math.max(0,1-w.r/400); dopCtx.strokeStyle=`rgba(56,189,248,${alpha})`; dopCtx.beginPath(); dopCtx.arc(w.x,w.y,w.r,0,Math.PI*2); dopCtx.stroke(); if(w.r>400) waves.splice(i,1); } dopCtx.fillStyle='#3b82f6'; dopCtx.beginPath(); dopCtx.arc(sourcePos.x,sourcePos.y,8,0,Math.PI*2); dopCtx.fill(); const cx=dopCtx.canvas.width/2; const cy=dopCtx.canvas.height/2; const vecX=cx-sourcePos.x; const vecY=cy-sourcePos.y; const dist=Math.sqrt(vecX*vecX+vecY*vecY); const speedTowards = (velocity.x*(vecX/dist) + velocity.y*(vecY/dist)); const factor = 1 + (speedTowards*0.08); const finalF = Math.max(100, Math.min(1000, 440*factor)); document.getElementById('doppler-obs-hz').innerText = Math.round(finalF)+' Hz'; if(dopplerOsc) dopplerOsc.frequency.setTargetAtTime(finalF, audioCtx.currentTime, 0.1); requestAnimationFrame(animateDoppler); }
+    function playSynthSound(type){
+        if(isLifeSoundPlaying) return;
+        initAudio(); isLifeSoundPlaying = true;
+        document.querySelectorAll('.life-btn').forEach(b => b.disabled = true);
+        const osc=audioCtx.createOscillator(), gain=audioCtx.createGain(); osc.connect(gain); gain.connect(audioCtx.destination); const now=audioCtx.currentTime;
+        let dur = 0;
+        if(type==='bird'){osc.type='sine'; osc.frequency.setValueAtTime(2000,now); osc.frequency.exponentialRampToValueAtTime(3000,now+0.1); osc.frequency.exponentialRampToValueAtTime(2000,now+0.2); gain.gain.setValueAtTime(0.1,now); gain.gain.exponentialRampToValueAtTime(0.01,now+0.3); osc.start(now); osc.stop(now+0.3); dur=0.3;}
+        else if(type==='siren'){osc.type='sawtooth'; osc.frequency.setValueAtTime(600,now); osc.frequency.linearRampToValueAtTime(1200,now+1); gain.gain.value=0.1; osc.start(now); osc.stop(now+1); dur=1;}
+        else if(type==='phone'){osc.type='square'; osc.frequency.setValueAtTime(800,now); const lfo=audioCtx.createOscillator(), lg=audioCtx.createGain(); lfo.frequency.value=20; lg.gain.value=500; lfo.connect(lg); lg.connect(osc.frequency); lfo.start(now); lfo.stop(now+1); gain.gain.value=0.1; osc.start(now); osc.stop(now+1); dur=1;}
+        else if(type==='game'){osc.type='square'; osc.frequency.setValueAtTime(200,now); osc.frequency.linearRampToValueAtTime(600,now+0.1); gain.gain.setValueAtTime(0.1,now); gain.gain.linearRampToValueAtTime(0,now+0.3); osc.start(now); osc.stop(now+0.3); dur=0.3;}
+        else if(type==='dog'){osc.type='sawtooth'; osc.frequency.setValueAtTime(300,now); osc.frequency.exponentialRampToValueAtTime(100,now+0.15); const f=audioCtx.createBiquadFilter(); f.type='lowpass'; f.frequency.value=800; osc.disconnect(); osc.connect(f); f.connect(gain); gain.gain.setValueAtTime(0.3,now); gain.gain.exponentialRampToValueAtTime(0.01,now+0.15); osc.start(now); osc.stop(now+0.15); dur=0.15;}
+        else if(type==='rain'){const b=audioCtx.createBuffer(1,audioCtx.sampleRate,audioCtx.sampleRate), d=b.getChannelData(0); for(let i=0;i<d.length;i++){const w=Math.random()*2-1; d[i]=(lastOut+(0.02*w))/1.02; lastOut=d[i]; d[i]*=3.5;} const n=audioCtx.createBufferSource(); n.buffer=b; const f=audioCtx.createBiquadFilter(); f.type='lowpass'; f.frequency.value=800; n.connect(f); f.connect(gain); gain.gain.value=0.15; n.start(now); n.stop(now+1); dur=1;}
+        else if(type==='alarm'){osc.type='square'; osc.frequency.setValueAtTime(1500,now); gain.gain.setValueAtTime(0.1,now); gain.gain.setValueAtTime(0,now+0.1); gain.gain.setValueAtTime(0.1,now+0.2); gain.gain.setValueAtTime(0,now+0.3); osc.start(now); osc.stop(now+0.4); dur=0.4;}
+        else if(type==='typing'){const b=audioCtx.createBuffer(1,audioCtx.sampleRate*0.05,audioCtx.sampleRate), d=b.getChannelData(0); for(let i=0;i<d.length;i++)d[i]=(Math.random()*2-1); const n=audioCtx.createBufferSource(); n.buffer=b; const f=audioCtx.createBiquadFilter(); f.type='highpass'; f.frequency.value=2000; n.connect(f); f.connect(gain); gain.gain.setValueAtTime(0.5,now); gain.gain.exponentialRampToValueAtTime(0.01,now+0.05); n.start(now); n.stop(now+0.1); dur=0.1;}
+        else if(type==='camera'){const b=audioCtx.createBuffer(1,audioCtx.sampleRate*0.1,audioCtx.sampleRate), d=b.getChannelData(0); for(let i=0;i<d.length;i++)d[i]=(Math.random()*2-1); const n=audioCtx.createBufferSource(); n.buffer=b; const f=audioCtx.createBiquadFilter(); f.type='lowpass'; f.frequency.value=500; n.connect(f); f.connect(gain); gain.gain.setValueAtTime(0.8,now); gain.gain.exponentialRampToValueAtTime(0.01,now+0.1); n.start(now); n.stop(now+0.1); dur=0.1;}
+        else if(type==='traffic'){const b=audioCtx.createBuffer(1,audioCtx.sampleRate*2,audioCtx.sampleRate), d=b.getChannelData(0); for(let i=0;i<d.length;i++)d[i]=(Math.random()*2-1); const n=audioCtx.createBufferSource(); n.buffer=b; const f=audioCtx.createBiquadFilter(); f.type='lowpass'; f.frequency.value=150; n.connect(f); f.connect(gain); gain.gain.setValueAtTime(0,now); gain.gain.linearRampToValueAtTime(0.4,now+1); gain.gain.linearRampToValueAtTime(0,now+2); n.start(now); n.stop(now+2); dur=2;}
+        else if(type==='thunder'){const b=audioCtx.createBuffer(1,audioCtx.sampleRate*2,audioCtx.sampleRate), d=b.getChannelData(0); for(let i=0;i<d.length;i++)d[i]=(Math.random()*2-1); const n=audioCtx.createBufferSource(); n.buffer=b; const f=audioCtx.createBiquadFilter(); f.type='lowpass'; f.frequency.value=100; n.connect(f); f.connect(gain); gain.gain.setValueAtTime(0.8,now); gain.gain.exponentialRampToValueAtTime(0.01,now+1.5); n.start(now); n.stop(now+2); dur=2;}
+        else if(type==='heart'){osc.type='sine'; osc.frequency.setValueAtTime(50,now); gain.gain.setValueAtTime(1,now); gain.gain.exponentialRampToValueAtTime(0.01,now+0.1); gain.gain.setValueAtTime(0.6,now+0.2); gain.gain.exponentialRampToValueAtTime(0.01,now+0.3); osc.start(now); osc.stop(now+0.4); dur=0.4;}
+        
+        // Classical Melodies
+        else if(type==='joy'){ dur=playMelody([659,659,698,784,784,698,659,587,523,523,587,659,659,587,587], [0.4,0.4,0.4,0.4,0.4,0.4,0.4,0.4,0.4,0.4,0.4,0.4,0.6,0.2,0.8]); }
+        else if(type==='mozart40'){ dur=playMelody([622,587,587,622,587,587,622,587,587,466], [0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2,1.0]); }
+        else if(type==='airg'){ dur=playMelody([523,523,493,440,392,392], [2.0,1.0,0.5,0.5,1.5,0.5]); }
+        else if(type==='swan'){ dur=playMelody([493,329,329,370,392,370,392,440], [0.5,0.5,0.5,0.5,0.5,0.5,0.5,1.5]); }
+        
+        // New Additions
+        else if(type==='carnival'){ dur=playMelody([196,247,293,392,293,392,293,247], [0.3,0.3,0.3,0.6,0.3,0.6,0.3,0.3]); }
+        else if(type==='nutcracker'){ dur=playMelody([987,784,880,784,987,784,659,523], [0.2,0.2,0.2,0.2,0.2,0.2,0.4,0.4]); }
+        else if(type==='goose'){ dur=playMelody([493,587,587,493,440,392], [1.0,1.0,0.5,0.5,1.0,2.0]); }
+        else if(type==='peter'){ dur=playMelody([392,440,392,329,392,880,659], [0.3,0.3,0.3,0.3,0.3,0.3,0.6]); }
+        else if(type==='pastoral'){ dur=playMelody([349,440,349,293,261,349,261], [0.4,0.2,0.2,0.4,0.4,0.4,0.8]); }
+        
+        else if(type==='spring'){ dur=playMelody([330,415,415,415,370,330,247], [0.4,0.2,0.2,0.2,0.2,0.4,0.8]); }
+        else if(type==='summer'){ dur=playMelody([196,196,196,196,196,196,196,196], [0.1,0.1,0.1,0.1,0.1,0.1,0.1,0.1]); }
+        else if(type==='autumn'){ dur=playMelody([349,440,349,440,349,440,523], [0.3,0.3,0.3,0.3,0.3,0.3,0.6]); }
+        else if(type==='winter'){ dur=playMelody([349,349,349,349,330,330,330,330], [0.15,0.15,0.15,0.15,0.15,0.15,0.15,0.15]); }
 
-    const stdViolin = [ {name:'G3', base:196.0, tension:50, xOff:0.2, thick:4}, {name:'D4', base:293.7, tension:50, xOff:0.4, thick:3}, {name:'A4', base:440.0, tension:50, xOff:0.6, thick:2}, {name:'E5', base:659.3, tension:50, xOff:0.8, thick:1} ];
-    let vStrings = JSON.parse(JSON.stringify(stdViolin)); let vOsc1=null, vOsc2=null, vVibrato=null, vNoise=null, vGain=null; let activeStringIdx = -1, fingerY = -1;
-    function initViolin() { const c=document.getElementById('canvas-violin'); c.width=c.parentElement.clientWidth; c.height=c.parentElement.clientHeight; c.addEventListener('mousedown', e=>{ const rect=c.getBoundingClientRect(); fingerY=e.clientY-rect.top; const clickX = e.clientX-rect.left; let minD = 9999; vStrings.forEach((s,i) => { const sx=c.width*s.xOff; const d=Math.abs(clickX-sx); if(d<minD){minD=d; activeStringIdx=i;} }); document.getElementById('finger-indicator').style.display='block'; document.getElementById('finger-indicator').style.top=fingerY+'px'; playViolinNote(); }); c.addEventListener('mousemove', e=>{ if(fingerY!==-1) { const rect=c.getBoundingClientRect(); fingerY=e.clientY-rect.top; document.getElementById('finger-indicator').style.top=fingerY+'px'; updateViolinFreq(); } }); window.addEventListener('mouseup', ()=>{ fingerY=-1; document.getElementById('finger-indicator').style.display='none'; stopViolinSounds(); activeStringIdx=-1; }); requestAnimationFrame(drawViolin); }
-    function resetViolin() { vStrings = JSON.parse(JSON.stringify(stdViolin)); [0,1,2,3].forEach(i=>{ const p=document.getElementById(`peg-${i}`); if(p) p.style.transform=`rotate(${i%2==0?45:-45}deg)`;}); }
-    let startY=0, tuneIdx=-1; window.startTuning = function(i) { tuneIdx=i; document.body.style.cursor='ns-resize'; startY=window.event.clientY; window.addEventListener('mousemove', onTuneMove); window.addEventListener('mouseup', onTuneUp); }
-    function onTuneMove(e) { const dy = startY - e.clientY; vStrings[tuneIdx].tension += dy*0.5; const p=document.getElementById(`peg-${tuneIdx}`); let cur = parseFloat(p.style.transform.replace(/[^\d.-]/g, '')) || 0; p.style.transform = `rotate(${cur+dy}deg)`; startY = e.clientY; if(activeStringIdx === tuneIdx) updateViolinFreq(); }
-    function onTuneUp() { document.body.style.cursor='default'; window.removeEventListener('mousemove', onTuneMove); window.removeEventListener('mouseup', onTuneUp); }
-    function getViolinFreq(idx) { const s = vStrings[idx]; const tensionFactor = 1 + (s.tension-50)*0.01; let lenFactor = 1; if(fingerY !== -1) { const c=document.getElementById('canvas-violin'); const totalL = c.height*1.5; const effL = totalL-fingerY; lenFactor = totalL/effL; } return s.base * tensionFactor * lenFactor; }
-    function playViolinNote() { initAudio(); if(activeStringIdx === -1) return; if(!vOsc1) { vGain = audioCtx.createGain(); vVibrato = audioCtx.createOscillator(); vVibrato.frequency.value = 5.5; const vibratoGain = audioCtx.createGain(); vibratoGain.gain.value = 3.0; vVibrato.connect(vibratoGain); vOsc1 = audioCtx.createOscillator(); vOsc1.type = 'sawtooth'; vOsc2 = audioCtx.createOscillator(); vOsc2.type = 'sawtooth'; vibratoGain.connect(vOsc1.frequency); vibratoGain.connect(vOsc2.frequency); const f1 = audioCtx.createBiquadFilter(); f1.type='bandpass'; f1.frequency.value=500; f1.Q.value=0.5; const f2 = audioCtx.createBiquadFilter(); f2.type='highshelf'; f2.frequency.value=2000; f2.gain.value=-8; const f3 = audioCtx.createBiquadFilter(); f3.type='peaking'; f3.frequency.value=3000; f3.gain.value=5; f3.Q.value=1; const bufferSize = audioCtx.sampleRate * 2; const buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate); const data = buffer.getChannelData(0); for (let i = 0; i < bufferSize; i++) data[i] = Math.random() * 2 - 1; vNoise = audioCtx.createBufferSource(); vNoise.buffer = buffer; vNoise.loop = true; const noiseFilter = audioCtx.createBiquadFilter(); noiseFilter.type = 'bandpass'; noiseFilter.frequency.value = 1000; noiseFilter.Q.value = 1; const noiseGain = audioCtx.createGain(); noiseGain.gain.value = 0.05; vNoise.connect(noiseFilter); noiseFilter.connect(noiseGain); noiseGain.connect(vGain); vOsc1.connect(f1); vOsc2.connect(f1); f1.connect(f2); f2.connect(f3); f3.connect(vGain); vGain.connect(audioCtx.destination); vOsc1.start(); vOsc2.start(); vVibrato.start(); vNoise.start(); vGain.gain.setValueAtTime(0, audioCtx.currentTime); vGain.gain.linearRampToValueAtTime(0.4, audioCtx.currentTime+0.2); } updateViolinFreq(); }
-    function updateViolinFreq() { if(activeStringIdx !== -1) { const f = getViolinFreq(activeStringIdx); document.getElementById('violin-hz').innerText = Math.round(f) + ' Hz'; const info = getNoteInfo(f); document.getElementById('violin-note-name').innerText = info.note; document.getElementById('violin-solfege').innerText = info.solfege; if(vOsc1) { vOsc1.frequency.setTargetAtTime(f, audioCtx.currentTime, 0.05); vOsc2.frequency.setTargetAtTime(f + 2, audioCtx.currentTime, 0.05); } } }
-    function stopViolinSounds() { if(vOsc1) { vGain.gain.cancelScheduledValues(audioCtx.currentTime); vGain.gain.setValueAtTime(vGain.gain.value, audioCtx.currentTime); vGain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime+0.1); vOsc1.stop(audioCtx.currentTime+0.1); vOsc2.stop(audioCtx.currentTime+0.1); vVibrato.stop(audioCtx.currentTime+0.1); vNoise.stop(audioCtx.currentTime+0.1); setTimeout(()=>{ vOsc1=null; vOsc2=null; }, 100); } }
-    function drawViolin() { const c=document.getElementById('canvas-violin'); if(!c || c.offsetParent===null) return; const ctx=c.getContext('2d'); ctx.clearRect(0,0,c.width,c.height); vStrings.forEach((s,i)=>{ const x = c.width*s.xOff; ctx.shadowBlur = (activeStringIdx===i && fingerY!==-1) ? 8 : 2; ctx.shadowColor = (activeStringIdx===i && fingerY!==-1) ? '#fbbf24' : 'black'; let off = (activeStringIdx===i && fingerY!==-1) ? (Math.random()-0.5)*3 : 0; const g=ctx.createLinearGradient(x,0,x+s.thick,0); g.addColorStop(0,'#999'); g.addColorStop(0.5,'#fff'); g.addColorStop(1,'#555'); ctx.fillStyle=g; ctx.fillRect(x+off, 0, s.thick, c.height); }); requestAnimationFrame(drawViolin); }
+        setTimeout(() => {
+            isLifeSoundPlaying = false;
+            document.querySelectorAll('.life-btn').forEach(b => b.disabled = false);
+        }, dur * 1000 + 100);
+    }
 
-    let recorderOsc=null, recorderGain=null; let holes=[false, false, false, false, false, false, false]; 
-    function toggleRecorderHole(idx) { holes[idx] = !holes[idx]; if(idx < 5) { const el = document.getElementById(`hole-${idx}`); if(holes[idx]) el.classList.add('closed'); else el.classList.remove('closed'); } else { const a = document.getElementById(`hole-${idx}a`); const b = document.getElementById(`hole-${idx}b`); if(holes[idx]) { a.classList.add('closed'); b.classList.add('closed'); } else { a.classList.remove('closed'); b.classList.remove('closed'); } } updateRecorderState(); }
-    function getRecorderState() { let firstOpen = 7; for(let i=0; i<7; i++) { if(holes[i] === false) { firstOpen = i; break; } } const freqs = [1046, 987, 880, 783, 698, 659, 587, 523]; const freq = freqs[firstOpen]; const height = 20 + (firstOpen/7)*80; return { freq, height }; }
-    function updateRecorderState() { const state = getRecorderState(); document.getElementById('recorder-hz').innerText = state.freq + ' Hz'; const info = getNoteInfo(state.freq); document.getElementById('recorder-note-name').innerText = info.note; document.getElementById('recorder-solfege').innerText = info.solfege; document.getElementById('air-column').style.height = state.height + '%'; if(recorderOsc) recorderOsc.frequency.setTargetAtTime(state.freq, audioCtx.currentTime, 0.1); }
-    function playRecorder() { initAudio(); if(recorderOsc) return; recorderOsc = audioCtx.createOscillator(); recorderGain = audioCtx.createGain(); recorderOsc.type = 'triangle'; const f = audioCtx.createBiquadFilter(); f.type='lowpass'; f.frequency.value=2500; recorderOsc.connect(f); f.connect(recorderGain); recorderGain.connect(audioCtx.destination); const state = getRecorderState(); recorderOsc.frequency.value = state.freq; recorderOsc.start(); recorderGain.gain.setValueAtTime(0, audioCtx.currentTime); recorderGain.gain.linearRampToValueAtTime(0.5, audioCtx.currentTime+0.1); const info = getNoteInfo(state.freq); document.getElementById('recorder-note-name').innerText = info.note; document.getElementById('recorder-solfege').innerText = info.solfege; }
-    function stopRecorder() { if(recorderOsc) { const now = audioCtx.currentTime; recorderGain.gain.cancelScheduledValues(now); recorderGain.gain.linearRampToValueAtTime(0, now+0.1); recorderOsc.stop(now+0.1); setTimeout(()=>{recorderOsc=null}, 100); } }
+    function playMelody(freqs, durs) {
+        let t = audioCtx.currentTime;
+        freqs.forEach((f, i) => {
+            const o = audioCtx.createOscillator(); const g = audioCtx.createGain(); o.type = 'triangle'; o.frequency.value = f;
+            o.connect(g); g.connect(audioCtx.destination); o.start(t); g.gain.setValueAtTime(0.3, t);
+            g.gain.exponentialRampToValueAtTime(0.01, t + durs[i]*0.9); o.stop(t + durs[i]);
+            t += durs[i];
+        });
+        return t - audioCtx.currentTime;
+    }
+
+    function initPiano() {
+        const c=document.getElementById('piano-container'); if(c.children.length>0)return;
+        const startOctave=3, endOctave=6; let whiteKeyCount=0; for(let o=startOctave; o<endOctave; o++)whiteKeyCount+=7; whiteKeyCount+=1;
+        const keyWidth=100/whiteKeyCount; let currentWhiteIndex=0;
+        for(let o=startOctave; o<=endOctave; o++) {
+            const notes=['C','D','E','F','G','A','B'];
+            for(let j=0; j<notes.length; j++) {
+                if(o===endOctave && notes[j]!=='C') break;
+                const n=notes[j]+o; const left=currentWhiteIndex*keyWidth;
+                const div=document.createElement('div'); div.className=`piano-key white-key cursor-pointer border border-slate-400 rounded-b shadow-sm absolute top-0 flex items-end justify-center pb-2`;
+                div.style.width=keyWidth+'%'; div.style.left=left+'%'; div.innerHTML=`<span class="text-[10px] text-slate-400 pointer-events-none mb-1">${n}</span>`;
+                div.onmousedown=()=>playPianoNote(n); c.appendChild(div);
+                if(['C','D','F','G','A'].includes(notes[j]) && !(o===endOctave)) {
+                    const bn=notes[j]+'#'+o; const bdiv=document.createElement('div'); bdiv.className=`piano-key black-key cursor-pointer border border-black rounded-b shadow-md absolute top-0`;
+                    bdiv.style.width=(keyWidth*0.6)+'%'; bdiv.style.left=(left+keyWidth*0.7)+'%'; bdiv.style.zIndex=10;
+                    bdiv.onmousedown=(e)=>{e.stopPropagation();playPianoNote(bn);}; c.appendChild(bdiv);
+                }
+                currentWhiteIndex++;
+            }
+        }
+    }
+    function playPianoNote(n) {
+        initAudio();
+        const note=n.slice(0,-1), octave=parseInt(n.slice(-1));
+        const noteIndex=['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'].indexOf(note);
+        const midi=noteIndex+(octave+1)*12; const freq=440*Math.pow(2,(midi-69)/12);
+        const o=audioCtx.createOscillator(), g=audioCtx.createGain(); o.type='triangle'; o.frequency.value=freq; o.connect(g); g.connect(audioCtx.destination);
+        const now=audioCtx.currentTime; g.gain.setValueAtTime(0,now); g.gain.linearRampToValueAtTime(pianoVol,now+0.01); g.gain.setTargetAtTime(0,now+0.01,0.2);
+        o.start(now); o.stop(now+1.5);
+        const i=getNoteInfo(freq); 
+        const d=document.getElementById('piano-display'); 
+        if(d) {
+            d.classList.remove('opacity-0'); clearTimeout(d.t);
+            const elHz = document.getElementById('piano-disp-hz'); const elNote = document.getElementById('piano-disp-note'); const elSol = document.getElementById('piano-disp-solfege');
+            if(elHz) elHz.innerText=Math.round(freq)+' Hz'; if(elNote) elNote.innerText=i.note; if(elSol) elSol.innerText=i.solfege;
+            d.t=setTimeout(()=>d.classList.add('opacity-0'),2000);
+        }
+    }
+    async function toggleTunerMode() {
+        initAudio(); const btn=document.getElementById('tuner-btn');
+        if(expertStream){expertStream.getTracks().forEach(t=>t.stop()); expertStream=null; btn.classList.replace('bg-red-600','bg-indigo-600'); btn.innerHTML='<i data-lucide="mic"></i> 開啟自由調音器'; document.getElementById('tuner-overlay').classList.remove('hidden'); cancelAnimationFrame(expertAnim);}
+        else{try{expertStream=await navigator.mediaDevices.getUserMedia({audio:{noiseSuppression:true,echoCancellation:true}}); const s=audioCtx.createMediaStreamSource(expertStream), a=audioCtx.createAnalyser(); a.fftSize=2048; s.connect(a); btn.classList.replace('bg-indigo-600','bg-red-600'); btn.innerHTML='<i data-lucide="stop-circle"></i> 停止'; document.getElementById('tuner-overlay').classList.add('hidden');
+        const buf=new Uint8Array(a.frequencyBinCount);
+        const drawTuner=()=>{if(!expertStream)return; expertAnim=requestAnimationFrame(drawTuner); a.getByteTimeDomainData(buf); 
+        let rms=0; for(let x of buf) rms+=((x-128)/128)**2; const db=20*Math.log10(Math.sqrt(rms/buf.length))+100; 
+        const gateEl=document.getElementById('expert-gate'); const gate=gateEl?parseInt(gateEl.value):40;
+        if(db>gate){const f=autoCorrelate(buf,audioCtx.sampleRate); if(f>50&&f<2000){const i=getNoteInfo(f); 
+            document.getElementById('expert-hz').innerText=Math.round(f) + ' Hz'; 
+            document.getElementById('expert-note').innerText=i.note; 
+            document.getElementById('expert-solfege').innerText=i.solfege; 
+            const deg=Math.max(-45,Math.min(45,i.cents)); document.getElementById('expert-needle').style.transform=`rotate(${deg}deg)`;}}}; drawTuner();}catch(e){alert("Mic Error");}}
+        lucide.createIcons();
+    }
+    function toggleMetronome(){isMetroPlaying=!isMetroPlaying; const btn=document.getElementById('metro-play-btn'); if(isMetroPlaying){initAudio(); metroNextNoteTime=audioCtx.currentTime; metroTimer=setInterval(scheduler,25); btn.innerHTML='<i data-lucide="square"></i> 停止 (STOP)'; btn.classList.replace('bg-slate-200','bg-pink-600'); btn.classList.replace('text-slate-900','text-white');}else{stopMetronome();}}
+    function stopMetronome(){isMetroPlaying=false; clearInterval(metroTimer); const btn=document.getElementById('metro-play-btn'); if(btn){btn.innerHTML='<i data-lucide="play"></i> 開始 (START)'; btn.classList.replace('bg-pink-600','bg-slate-200'); btn.classList.replace('text-white','text-slate-900');}}
+    function scheduler(){while(metroNextNoteTime<audioCtx.currentTime+0.1){scheduleNote(metroBeat,metroNextNoteTime); nextNote();}}
+    function nextNote(){const spb=60.0/metroBpm; metroNextNoteTime+=spb; metroBeat=(metroBeat+1)%metroBeatsPerBar;}
+    function scheduleNote(bn,t){const o=audioCtx.createOscillator(), g=audioCtx.createGain(); o.connect(g); g.connect(audioCtx.destination); if(bn===0)o.frequency.value=1000; else o.frequency.value=800; o.start(t); o.stop(t+0.05); g.gain.setValueAtTime(1,t); g.gain.exponentialRampToValueAtTime(0.01,t+0.05); setTimeout(()=>{const l=document.getElementById('metro-light'); if(l){l.classList.remove('beat-flash'); void l.offsetWidth; l.classList.add('beat-flash'); l.style.backgroundColor=bn===0?'#ef4444':'#fbbf24';}},(t-audioCtx.currentTime)*1000);}
+    function updateMetronomeParams(){metroBpm=document.getElementById('metro-bpm').value; document.getElementById('metro-bpm-display').innerText=metroBpm;}
+    function setMetroSignature(n){metroBeatsPerBar=n; metroBeat=0; document.querySelectorAll('.metro-sig-btn').forEach(b=>{b.classList.remove('active','bg-pink-600','text-white','border-pink-700'); b.classList.add('bg-slate-700','text-slate-300','border-slate-600');}); event.target.classList.remove('bg-slate-700','text-slate-300','border-slate-600'); event.target.classList.add('active','bg-pink-600','text-white','border-pink-700');}
+    function tapTempo(){const now=Date.now(); if(lastTapTime){const d=now-lastTapTime, b=Math.round(60000/d); if(b>=40&&b<=208){metroBpm=b; document.getElementById('metro-bpm').value=b; document.getElementById('metro-bpm-display').innerText=b;}} lastTapTime=now;}
+
+    function setCoachMode(mode) {
+        coachMode = mode;
+        document.getElementById('btn-mode-training').className = mode==='training' ? 'px-4 py-1.5 rounded text-sm font-bold transition bg-emerald-600 text-white' : 'px-4 py-1.5 rounded text-sm font-bold transition text-slate-400 hover:text-white';
+        document.getElementById('btn-mode-scoring').className = mode==='scoring' ? 'px-4 py-1.5 rounded text-sm font-bold transition bg-emerald-600 text-white' : 'px-4 py-1.5 rounded text-sm font-bold transition text-slate-400 hover:text-white';
+        if(mode === 'training') {
+            document.getElementById('coach-ui-training').classList.remove('hidden');
+            document.getElementById('coach-ui-scoring').classList.add('hidden');
+            document.getElementById('coach-title').innerText = "聽音準訓練";
+            document.getElementById('coach-desc').innerText = "系統會播放一個音高，請試著唱出一樣的聲音！";
+            document.getElementById('btn-next-q').innerText = "下一題";
+        } else {
+            document.getElementById('coach-ui-training').classList.add('hidden');
+            document.getElementById('coach-ui-scoring').classList.remove('hidden');
+            document.getElementById('coach-title').innerText = "音準大挑戰";
+            document.getElementById('coach-desc').innerText = "測驗模式：請在播放完畢後，唱出該音高持續2秒。";
+            document.getElementById('btn-next-q').innerText = "開始測驗";
+        }
+    }
+    
+    function startCoachGame() { document.getElementById('coach-start-screen').classList.add('hidden'); nextCoachQuestion(); }
+    function stopCoachGame() { 
+        if(coachStream) { coachStream.getTracks().forEach(t=>t.stop()); coachStream=null; } 
+        cancelAnimationFrame(coachAnim); 
+        clearInterval(scoringTimer);
+        document.getElementById('coach-start-screen').classList.remove('hidden');
+        document.getElementById('coach-score-screen').classList.add('hidden');
+    }
+    function resetCoachGame() { document.getElementById('coach-score-screen').classList.add('hidden'); nextCoachQuestion(); }
+    
+    function nextCoachQuestion() {
+        const noteIndex = Math.floor(Math.random() * 12); const midi = 60 + noteIndex; targetNoteFreq = 440 * Math.pow(2, (midi - 69) / 12); const i = getNoteInfo(targetNoteFreq); targetNoteName = i.note;
+        document.getElementById('game-target-note').innerText = i.note;
+        playTargetSound(); 
+        if(coachMode === 'training') {
+             document.getElementById('game-result-text').innerText = "請聆聽並唱出聲音..."; document.getElementById('game-result-text').className = "h-8 text-xl font-bold text-slate-400"; document.getElementById('game-feedback-bar').style.width = '0px';
+             if(!coachStream) startCoachMic();
+        } else {
+             document.getElementById('game-result-text').innerText = "播放中...";
+             document.getElementById('scoring-status').innerText = "請仔細聆聽...";
+             document.getElementById('scoring-progress').style.width = "0%";
+             scoreSamples = [];
+             setTimeout(() => {
+                 document.getElementById('scoring-status').innerText = "請唱出聲音！";
+                 document.getElementById('scoring-status').className = "text-xl font-bold text-green-400 mb-2";
+                 if(!coachStream) startCoachMic();
+                 let progress = 0;
+                 scoringTimer = setInterval(() => { progress += 2; document.getElementById('scoring-progress').style.width = progress + "%"; if(progress >= 100) { clearInterval(scoringTimer); finishScoring(); } }, 60);
+             }, 1500);
+        }
+    }
+    function playTargetSound() { initAudio(); const o=audioCtx.createOscillator(), g=audioCtx.createGain(); o.type='triangle'; o.frequency.value=targetNoteFreq; o.connect(g); g.connect(audioCtx.destination); const now=audioCtx.currentTime; g.gain.setValueAtTime(0,now); g.gain.linearRampToValueAtTime(0.5,now+0.05); g.gain.exponentialRampToValueAtTime(0.001,now+1.5); o.start(now); o.stop(now+1.5); }
+    async function startCoachMic() {
+        try { coachStream = await navigator.mediaDevices.getUserMedia({audio:{noiseSuppression:true,echoCancellation:true}}); const s=audioCtx.createMediaStreamSource(coachStream), a=audioCtx.createAnalyser(); a.fftSize=2048; s.connect(a); const buf=new Uint8Array(a.frequencyBinCount);
+            const loop = () => {
+                if(!coachStream) return; coachAnim = requestAnimationFrame(loop); a.getByteTimeDomainData(buf);
+                let rms=0; for(let x of buf) rms+=((x-128)/128)**2; const db=20*Math.log10(Math.sqrt(rms/buf.length))+100;
+                if(db > 40) {
+                    const f = autoCorrelate(buf, audioCtx.sampleRate);
+                    if(f>50 && f<1500) {
+                        document.getElementById('game-user-hz').innerText = Math.round(f) + ' Hz';
+                        const centsDiff = 1200 * Math.log2(f / targetNoteFreq); const absCents = Math.abs(centsDiff);
+                        if(coachMode === 'training') {
+                            const resText = document.getElementById('game-result-text'); const bar = document.getElementById('game-feedback-bar');
+                            let pos = 50 + (centsDiff); pos = Math.max(0, Math.min(100, pos)); bar.style.left = pos + '%'; bar.style.opacity = 1;
+                            if(absCents < 15) { resText.innerText = "太棒了！100分 (Perfect)"; resText.className = "h-8 text-xl font-bold text-green-400 success-pulse"; bar.style.backgroundColor = '#4ade80'; } else if(absCents < 50) { resText.innerText = "很接近，加油！"; resText.className = "h-8 text-xl font-bold text-yellow-400"; bar.style.backgroundColor = '#facc15'; } else { resText.innerText = centsDiff > 0 ? "太高了" : "太低了"; resText.className = "h-8 text-xl font-bold text-red-400"; bar.style.backgroundColor = '#f87171'; }
+                        } else { scoreSamples.push(absCents); }
+                    }
+                } else { if(coachMode === 'training') document.getElementById('game-feedback-bar').style.opacity = 0; }
+            }; loop();
+        } catch(e){ alert("Mic Error"); }
+    }
+    function finishScoring() {
+        let finalScore = 0, comment = "未偵測到聲音";
+        if(scoreSamples.length > 10) {
+            scoreSamples.sort((a,b)=>a-b); const validSamples = scoreSamples.slice(0, Math.floor(scoreSamples.length * 0.8)); 
+            const avgErr = validSamples.reduce((a,b)=>a+b,0) / validSamples.length;
+            let rawScore = 100 - (avgErr > 10 ? (avgErr-10) : 0); if(rawScore < 0) rawScore = 0; finalScore = Math.round(rawScore);
+            if(finalScore >= 95) comment = "完美音準！你是天生的歌手！"; else if(finalScore >= 80) comment = "非常棒！繼續保持！"; else if(finalScore >= 60) comment = "不錯，還可以更準確一點！"; else comment = "再接再厲，多聽幾次試試看！";
+        }
+        document.getElementById('final-score').innerText = finalScore; document.getElementById('final-comment').innerText = comment; document.getElementById('coach-score-screen').classList.remove('hidden');
+    }
+
+    function initBeats() { 
+        const ca=document.getElementById('canvas-beat-a'); if(ca){ca.width=ca.parentElement.clientWidth; ca.height=ca.parentElement.clientHeight;}
+        const cb=document.getElementById('canvas-beat-b'); if(cb){cb.width=cb.parentElement.clientWidth; cb.height=cb.parentElement.clientHeight;}
+        const cs=document.getElementById('canvas-beat-sum'); if(cs){cs.width=cs.parentElement.clientWidth; cs.height=cs.parentElement.clientHeight;}
+        updateBeats();
+    }
+    function toggleBeats() {
+        initAudio(); const btn=document.getElementById('beats-btn');
+        if(beatOsc1){stopBeats(); btn.innerText="播放"; btn.classList.remove('bg-pink-600');}
+        else{beatOsc1=audioCtx.createOscillator(); beatOsc2=audioCtx.createOscillator(); beatGain=audioCtx.createGain(); beatOsc1.frequency.value=440; beatOsc2.frequency.value=parseFloat(document.getElementById('beat-f2').value); beatOsc1.connect(beatGain); beatOsc2.connect(beatGain); beatGain.connect(audioCtx.destination); beatGain.gain.value=0.2; beatOsc1.start(); beatOsc2.start(); btn.innerText="停止"; btn.classList.add('bg-pink-600'); updateBeats();}
+    }
+    function stopBeats(){if(beatOsc1){beatOsc1.stop(); beatOsc1=null;} if(beatOsc2){beatOsc2.stop(); beatOsc2=null;}}
+    function updateBeats(){
+        const f2=parseFloat(document.getElementById('beat-f2').value); document.getElementById('beat-f2-val').innerText=f2+' Hz'; 
+        if(beatOsc2)beatOsc2.frequency.value=f2; 
+        const d=Math.abs(440-f2).toFixed(1); document.getElementById('beat-freq-display').innerText=d+' Hz'; document.getElementById('beat-count').innerText=Math.round(d); 
+        drawBeatWaves();
+    }
+    function drawBeatWaves(){
+        const ca=document.getElementById('canvas-beat-a'); if(!ca) return; const ctxA=ca.getContext('2d'), w=ca.width, h=ca.height;
+        const cb=document.getElementById('canvas-beat-b'); if(!cb) return; const ctxB=cb.getContext('2d');
+        const cs=document.getElementById('canvas-beat-sum'); if(!cs) return; const ctxS=cs.getContext('2d');
+        const f1=440, f2=parseFloat(document.getElementById('beat-f2').value);
+        ctxA.fillStyle='black'; ctxA.fillRect(0,0,w,h); ctxA.lineWidth=2; ctxA.strokeStyle='#3b82f6'; ctxA.beginPath();
+        for(let x=0; x<w; x++){ const t=x*0.1; const y=h/2 + Math.sin(t)*h/2.5; if(x===0)ctxA.moveTo(x,y); else ctxA.lineTo(x,y); } ctxA.stroke();
+        const ratio = f2/440; ctxB.fillStyle='black'; ctxB.fillRect(0,0,w,h); ctxB.lineWidth=2; ctxB.strokeStyle='#f472b6'; ctxB.beginPath();
+        for(let x=0; x<w; x++){ const t=x*0.1; const y=h/2 + Math.sin(t*ratio)*h/2.5; if(x===0)ctxB.moveTo(x,y); else ctxB.lineTo(x,y); } ctxB.stroke();
+        ctxS.fillStyle='black'; ctxS.fillRect(0,0,w,h); ctxS.lineWidth=2; ctxS.strokeStyle='white'; ctxS.beginPath();
+        const beatFreq = Math.abs(440-f2); const scale = (beatFreq + 1) * 0.2; 
+        for(let x=0; x<w; x++){ const t=x*0.05; const env = Math.cos(scale * t * 0.1); const carrier = Math.sin(x * 0.5); const y = h/2 + (env * carrier * h/2.5); if(x===0)ctxS.moveTo(x,y); else ctxS.lineTo(x,y); } ctxS.stroke();
+    }
 
     switchTab('wave-gen');
 </script>
