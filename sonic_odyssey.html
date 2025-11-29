@@ -1,0 +1,794 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>聲控飛梭 - Sonic Odyssey</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            background-color: #0f172a;
+            color: white;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            touch-action: none;
+            user-select: none;
+        }
+        canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+        }
+        .ui-layer {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            padding: 20px;
+            box-sizing: border-box;
+        }
+        .interactive {
+            pointer-events: auto;
+        }
+        .panel {
+            background: rgba(15, 23, 42, 0.9);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(56, 189, 248, 0.3);
+            border-radius: 16px;
+            padding: 1.5rem;
+            max-width: 500px;
+            width: 95%;
+            margin: 0 auto;
+            text-align: center;
+            box-shadow: 0 0 30px rgba(56, 189, 248, 0.15);
+            transition: all 0.3s ease;
+            max-height: 90vh;
+            overflow-y: auto;
+        }
+        .hud-text {
+            text-shadow: 0 0 5px rgba(0, 0, 0, 0.8);
+        }
+        input[type=range] {
+            -webkit-appearance: none;
+            width: 100%;
+            background: transparent;
+        }
+        input[type=range]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            height: 20px;
+            width: 20px;
+            border-radius: 50%;
+            background: #38bdf8;
+            cursor: pointer;
+            margin-top: -8px;
+            box-shadow: 0 0 10px #38bdf8;
+        }
+        input[type=range]::-webkit-slider-runnable-track {
+            width: 100%;
+            height: 4px;
+            cursor: pointer;
+            background: #334155;
+            border-radius: 2px;
+        }
+        /* Selection Styles */
+        .radio-group label {
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .radio-group input:checked + div {
+            background-color: rgba(56, 189, 248, 0.2);
+            border-color: #38bdf8;
+            color: #38bdf8;
+            box-shadow: 0 0 10px rgba(56, 189, 248, 0.2);
+        }
+        /* Difficulty specific colors for checked state */
+        .diff-group input[value="easy"]:checked + div {
+            border-color: #22c55e; color: #22c55e; background-color: rgba(34, 197, 94, 0.2);
+        }
+        .diff-group input[value="medium"]:checked + div {
+            border-color: #f59e0b; color: #f59e0b; background-color: rgba(245, 158, 11, 0.2);
+        }
+        .diff-group input[value="hard"]:checked + div {
+            border-color: #ef4444; color: #ef4444; background-color: rgba(239, 68, 68, 0.2);
+        }
+    </style>
+</head>
+<body>
+
+    <canvas id="gameCanvas"></canvas>
+
+    <div class="ui-layer">
+        
+        <!-- HUD -->
+        <div id="hud" class="flex justify-between items-start w-full opacity-0 transition-opacity duration-500">
+            <div class="hud-text">
+                <div class="text-2xl font-bold text-sky-400">距離: <span id="scoreDisplay">0</span> m</div>
+                <div class="text-xs text-gray-400 mt-1 bg-slate-800/50 px-2 py-1 rounded inline-block">難度: <span id="diffDisplay">簡單</span></div>
+            </div>
+            
+            <div class="flex flex-col items-end gap-2 interactive">
+                <div class="w-48 h-20 bg-slate-900/80 border border-slate-700 rounded p-1 relative overflow-hidden flex flex-col justify-end">
+                    <div class="text-xs text-gray-400 absolute top-1 left-1 z-10">音高 (Pitch)</div>
+                    <div id="pitchBar" class="h-full bg-gradient-to-r from-emerald-500 via-yellow-400 to-red-500 w-0 transition-all duration-75 opacity-70 absolute top-0 left-0"></div>
+                    <div id="freqDisplay" class="relative z-10 text-right pr-1 text-xs text-white font-mono opacity-80">0 Hz</div>
+                    <div id="noteDisplay" class="relative z-10 text-right pr-1 text-lg font-bold text-sky-300 leading-none pb-1">--</div>
+                    <div class="absolute top-0 left-1/2 w-px h-full bg-white/20"></div>
+                </div>
+                <button onclick="toggleSettings()" class="bg-slate-700 hover:bg-slate-600 text-white p-2 rounded text-xs transition-colors shadow-lg">
+                    ⚙️ 靈敏度設定
+                </button>
+            </div>
+        </div>
+
+        <!-- Start Screen -->
+        <div id="startScreen" class="absolute inset-0 flex items-center justify-center interactive bg-slate-900/95 z-50 transition-opacity duration-300">
+            <div class="panel my-auto flex flex-col h-full justify-center">
+                <h1 class="text-3xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-sky-400 to-cyan-300 mb-1">
+                    聲控飛梭 <br> Sonic Odyssey
+                </h1>
+                <div class="text-sky-500 font-bold mb-2 text-xs tracking-widest uppercase">by 小萬老師</div>
+                
+                <div class="overflow-y-auto pr-2 custom-scrollbar flex-1">
+                    <!-- Step 1: Voice Range -->
+                    <div class="bg-slate-800/50 p-3 rounded-xl mb-3 text-left border border-slate-700/50">
+                        <h3 class="font-bold text-sky-200 mb-2 text-sm">🎙️ 第一步：選擇音域</h3>
+                        <div class="grid grid-cols-2 gap-2 radio-group">
+                            <label class="relative">
+                                <input type="radio" name="voiceRange" value="male" class="hidden" checked onchange="updateVoiceConfig()">
+                                <div class="border border-slate-600 rounded-lg p-2 text-center hover:bg-slate-700/50">
+                                    <div class="text-lg">👨 男聲</div>
+                                    <div class="text-[10px] text-gray-500">80Hz - 450Hz</div>
+                                </div>
+                            </label>
+                            <label class="relative">
+                                <input type="radio" name="voiceRange" value="female" class="hidden" onchange="updateVoiceConfig()">
+                                <div class="border border-slate-600 rounded-lg p-2 text-center hover:bg-slate-700/50">
+                                    <div class="text-lg">👩 女聲</div>
+                                    <div class="text-[10px] text-gray-500">150Hz - 800Hz</div>
+                                </div>
+                            </label>
+                        </div>
+                    </div>
+
+                    <!-- Step 2: Difficulty -->
+                    <div class="bg-slate-800/50 p-3 rounded-xl mb-3 text-left border border-slate-700/50">
+                        <h3 class="font-bold text-sky-200 mb-2 text-sm">🎮 第二步：選擇難度</h3>
+                        <div class="grid grid-cols-3 gap-2 radio-group diff-group">
+                            <label class="relative">
+                                <input type="radio" name="difficulty" value="easy" class="hidden" checked onchange="updateDifficultyConfig()">
+                                <div class="border border-slate-600 rounded-lg p-2 text-center hover:bg-slate-700/50">
+                                    <div class="font-bold text-sm">簡單</div>
+                                    <div class="text-[10px] text-gray-500">無障礙</div>
+                                </div>
+                            </label>
+                            <label class="relative">
+                                <input type="radio" name="difficulty" value="medium" class="hidden" onchange="updateDifficultyConfig()">
+                                <div class="border border-slate-600 rounded-lg p-2 text-center hover:bg-slate-700/50">
+                                    <div class="font-bold text-sm">中等</div>
+                                    <div class="text-[10px] text-gray-500">少量障礙</div>
+                                </div>
+                            </label>
+                            <label class="relative">
+                                <input type="radio" name="difficulty" value="hard" class="hidden" onchange="updateDifficultyConfig()">
+                                <div class="border border-slate-600 rounded-lg p-2 text-center hover:bg-slate-700/50">
+                                    <div class="font-bold text-sm">困難</div>
+                                    <div class="text-[10px] text-gray-500">密集障礙</div>
+                                </div>
+                            </label>
+                        </div>
+                    </div>
+
+                    <!-- Step 3: Mic Test -->
+                    <div class="bg-slate-800/50 p-3 rounded-xl mb-4 text-left border border-slate-700/50">
+                        <h3 class="font-bold text-sky-200 mb-2 text-sm">🔊 第三步：發聲測試</h3>
+                        <div class="w-full h-10 bg-slate-900 rounded-lg overflow-hidden border border-slate-700 relative mb-1">
+                            <div id="previewPitchBar" class="h-full bg-sky-500 w-0 transition-all duration-75"></div>
+                            <div class="absolute inset-0 flex items-center justify-center pointer-events-none gap-2">
+                                <span id="previewNote" class="text-base font-bold text-white drop-shadow-md">--</span>
+                                <span id="previewFreq" class="text-xs text-gray-400">未偵測</span>
+                            </div>
+                        </div>
+                        <p class="text-[10px] text-gray-500 text-center">若試音條沒反應，請點擊下方按鈕</p>
+                    </div>
+                </div>
+
+                <div class="flex gap-2 mt-2">
+                     <button onclick="requestMicAccess()" class="flex-1 bg-slate-700 hover:bg-slate-600 text-white font-bold py-3 px-2 rounded-lg transition-colors text-xs sm:text-sm">
+                        1. 開啟麥克風
+                    </button>
+                    <button onclick="startGame()" id="startBtn" class="flex-1 bg-gradient-to-r from-sky-500 to-blue-600 hover:from-sky-400 hover:to-blue-500 text-white font-bold py-3 px-2 rounded-lg shadow-lg transform transition hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed text-xs sm:text-sm" disabled>
+                        2. 啟動引擎 (Start)
+                    </button>
+                </div>
+                
+                <!-- New Button: Back to Lab -->
+                <a href="https://sites.google.com/view/cutedavid/%E9%A6%96%E9%A0%81?authuser=0" class="block w-full mt-3 bg-slate-800 hover:bg-slate-700 text-sky-400 text-sm font-bold py-2 px-4 rounded-lg transition-colors border border-slate-700">
+                    🔙 返回萬老師實驗室
+                </a>
+            </div>
+        </div>
+
+        <!-- Game Over Screen -->
+        <div id="gameOverScreen" class="hidden absolute inset-0 flex items-center justify-center interactive bg-slate-900/90 z-50">
+            <div class="panel">
+                <div class="text-6xl mb-4">💥</div>
+                <h2 class="text-3xl font-bold text-red-500 mb-2">墜毀警報!</h2>
+                <div class="py-4 my-4 bg-slate-800/50 rounded-lg">
+                    <p class="text-gray-400 text-sm mb-1">本次飛行距離</p>
+                    <p class="text-4xl text-white font-mono"><span id="finalScore" class="text-sky-400">0</span> m</p>
+                </div>
+                <div class="flex flex-col gap-2">
+                    <button onclick="returnToTitle()" class="w-full bg-slate-700 hover:bg-slate-600 text-white font-bold py-3 px-6 rounded-lg transition-colors border border-slate-600">
+                        返回開始畫面
+                    </button>
+                    <a href="https://sites.google.com/view/cutedavid/%E9%A6%96%E9%A0%81?authuser=0" class="block w-full bg-slate-800 hover:bg-slate-700 text-sky-400 text-sm font-bold py-3 px-4 rounded-lg transition-colors border border-slate-700">
+                        🔙 返回萬老師實驗室
+                    </a>
+                </div>
+            </div>
+        </div>
+
+        <!-- In-Game Settings Modal -->
+        <div id="settingsModal" class="hidden absolute inset-0 flex items-center justify-center interactive z-40 bg-black/40 backdrop-blur-sm">
+            <div class="panel relative">
+                <button onclick="toggleSettings()" class="absolute top-2 right-3 text-gray-400 hover:text-white p-2 text-xl">✕</button>
+                <h3 class="text-xl font-bold text-white mb-6 border-b border-slate-700 pb-2">飛行系統調校</h3>
+                
+                <div class="mb-6 text-left">
+                    <div class="flex justify-between mb-2">
+                        <label class="text-sm text-sky-300 font-bold">降噪閥值 (靈敏度)</label>
+                        <span class="text-xs bg-slate-700 px-2 py-1 rounded text-white" id="thresholdVal">20</span>
+                    </div>
+                    <input type="range" min="1" max="60" value="25" id="noiseThreshold" oninput="updateSettings()">
+                    <p class="text-xs text-gray-400 mt-2">
+                        💡 數值越高越不靈敏。如果飛船在不說話時亂動，請<span class="text-yellow-400">調高</span>此數值。
+                    </p>
+                </div>
+
+                <div class="mb-6 text-left">
+                    <div class="flex justify-between mb-2">
+                        <label class="text-sm text-sky-300 font-bold">平滑度 (Smoothing)</label>
+                        <span class="text-xs bg-slate-700 px-2 py-1 rounded text-white" id="smoothVal">0.85</span>
+                    </div>
+                    <input type="range" min="0" max="0.95" step="0.05" value="0.85" id="smoothing" oninput="updateSettings()">
+                </div>
+                
+                <button onclick="toggleSettings()" class="w-full bg-sky-600 hover:bg-sky-500 text-white py-2 rounded">
+                    完成
+                </button>
+            </div>
+        </div>
+
+    </div>
+
+    <script>
+        // --- Game Configuration & State ---
+        const config = {
+            speed: 4, 
+            gravity: 0.1,
+            shipRadius: 14,
+            terrainResolution: 40, 
+            minPitch: 80, 
+            maxPitch: 450, 
+            smoothing: 0.85,
+            safeZoneDistance: 600,
+            
+            // Difficulty related
+            difficulty: 'easy', // easy, medium, hard
+            gapSizeFactor: 0.6, // 1.0 = wide, 0.3 = narrow
+            obstacleChance: 0 // Chance to spawn obstacle per segment
+        };
+
+        const state = {
+            screen: 'start', 
+            score: 0,
+            distance: 0,
+            lastTime: 0,
+            shipY: 0,
+            targetY: 0,
+            velocity: 0,
+            particles: [],
+            terrainPoints: [], // {x, topY, bottomY}
+            obstacles: [], // {x, y, radius, type}
+            audioContext: null,
+            analyser: null,
+            mediaStreamSource: null,
+            buf: new Float32Array(2048),
+            currentPitch: 0,
+            currentVolume: 0,
+            isMicReady: false
+        };
+
+        // --- Elements ---
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const scoreEl = document.getElementById('scoreDisplay');
+        const finalScoreEl = document.getElementById('finalScore');
+        const diffDisplayEl = document.getElementById('diffDisplay');
+        
+        const freqEl = document.getElementById('freqDisplay');
+        const noteDisplayEl = document.getElementById('noteDisplay');
+        const pitchBar = document.getElementById('pitchBar');
+        
+        const previewPitchBar = document.getElementById('previewPitchBar');
+        const previewFreqEl = document.getElementById('previewFreq');
+        const previewNoteEl = document.getElementById('previewNote');
+        
+        // --- Music Theory Helper ---
+        const NOTE_NAMES = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
+        const SOLFEGE_NAMES = ["Do", "Di", "Re", "Ri", "Mi", "Fa", "Fi", "Sol", "Si", "La", "Li", "Ti"];
+
+        function getNoteData(frequency) {
+            if (frequency <= 0) return { note: '--', solfege: '--' };
+            const noteNum = 12 * (Math.log(frequency / 440) / Math.log(2));
+            const midi = Math.round(noteNum) + 69;
+            const noteIndex = midi % 12;
+            const octave = Math.floor(midi / 12) - 1;
+            if(noteIndex < 0) return { note: '?', solfege: '?' };
+            return { note: NOTE_NAMES[noteIndex] + octave, solfege: SOLFEGE_NAMES[noteIndex] };
+        }
+
+        // --- Audio Logic ---
+        async function requestMicAccess() {
+            if (state.isMicReady) return;
+            try {
+                if (!window.AudioContext) window.AudioContext = window.webkitAudioContext;
+                state.audioContext = new AudioContext();
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: {
+                    echoCancellation: true, noiseSuppression: true, autoGainControl: false 
+                }});
+                state.mediaStreamSource = state.audioContext.createMediaStreamSource(stream);
+                state.analyser = state.audioContext.createAnalyser();
+                state.analyser.fftSize = 2048;
+                state.mediaStreamSource.connect(state.analyser);
+                state.isMicReady = true;
+                document.getElementById('startBtn').disabled = false;
+                document.getElementById('startBtn').classList.remove('opacity-50', 'cursor-not-allowed');
+                requestAnimationFrame(previewLoop);
+                return true;
+            } catch (e) {
+                alert("無法存取麥克風。請確認權限。");
+                return false;
+            }
+        }
+
+        function autoCorrelate(buf, sampleRate) {
+            let SIZE = buf.length;
+            let rms = 0;
+            for (let i = 0; i < SIZE; i++) rms += buf[i] * buf[i];
+            rms = Math.sqrt(rms / SIZE);
+            state.currentVolume = rms;
+            const thresholdInput = document.getElementById('noiseThreshold').value / 1000; 
+            if (rms < thresholdInput) return -1;
+
+            let r1 = 0, r2 = SIZE - 1, thres = 0.2;
+            for (let i = 0; i < SIZE / 2; i++) if (Math.abs(buf[i]) < thres) { r1 = i; break; }
+            for (let i = 1; i < SIZE / 2; i++) if (Math.abs(buf[SIZE - i]) < thres) { r2 = SIZE - i; break; }
+            buf = buf.slice(r1, r2);
+            SIZE = buf.length;
+
+            let c = new Array(SIZE).fill(0);
+            for (let i = 0; i < SIZE; i++) for (let j = 0; j < SIZE - i; j++) c[i] = c[i] + buf[j] * buf[j + i];
+            let d = 0; while (c[d] > c[d + 1]) d++;
+            let maxval = -1, maxpos = -1;
+            for (let i = d; i < SIZE; i++) if (c[i] > maxval) { maxval = c[i]; maxpos = i; }
+            let T0 = maxpos;
+            let x1 = c[T0 - 1], x2 = c[T0], x3 = c[T0 + 1];
+            let a = (x1 + x3 - 2 * x2) / 2;
+            let b = (x3 - x1) / 2;
+            if (a) T0 = T0 - b / (2 * a);
+            return sampleRate / T0;
+        }
+
+        function getPitchPercent(pitch) {
+            let percent = (pitch - config.minPitch) / (config.maxPitch - config.minPitch);
+            return Math.max(0, Math.min(1, percent));
+        }
+
+        function processAudio() {
+            if (!state.analyser) return -1;
+            state.analyser.getFloatTimeDomainData(state.buf);
+            const ac = autoCorrelate(state.buf, state.audioContext.sampleRate);
+            if (ac !== -1) {
+                if (ac > 50 && ac < 1500) {
+                    state.currentPitch = state.currentPitch * config.smoothing + ac * (1 - config.smoothing);
+                    return state.currentPitch;
+                }
+            }
+            return -1;
+        }
+
+        function previewLoop() {
+            if (state.screen !== 'start') return;
+            const pitch = processAudio();
+            const percent = getPitchPercent(state.currentPitch);
+            previewPitchBar.style.width = (percent * 100) + '%';
+            if (pitch !== -1 && state.currentVolume > 0.005) {
+                const noteData = getNoteData(state.currentPitch);
+                previewFreqEl.innerText = Math.round(state.currentPitch) + " Hz";
+                previewNoteEl.innerText = `${noteData.note} (${noteData.solfege})`;
+                previewPitchBar.style.opacity = 1;
+            } else {
+                previewFreqEl.innerText = "等待聲音...";
+                previewNoteEl.innerText = "--";
+                previewPitchBar.style.opacity = 0.3;
+            }
+            requestAnimationFrame(previewLoop);
+        }
+
+        function updateVoiceConfig() {
+            const mode = document.querySelector('input[name="voiceRange"]:checked').value;
+            if (mode === 'male') { config.minPitch = 80; config.maxPitch = 450; }
+            else { config.minPitch = 150; config.maxPitch = 800; }
+        }
+
+        function updateDifficultyConfig() {
+            const diff = document.querySelector('input[name="difficulty"]:checked').value;
+            config.difficulty = diff;
+            
+            const diffTextMap = { 'easy': '簡單', 'medium': '中等', 'hard': '困難' };
+            diffDisplayEl.innerText = diffTextMap[diff];
+            diffDisplayEl.className = ''; // Reset class
+            
+            if (diff === 'easy') {
+                config.gapSizeFactor = 0.65; // Wide gap
+                config.obstacleChance = 0; // No obstacles
+                diffDisplayEl.classList.add('text-green-400');
+            } else if (diff === 'medium') {
+                config.gapSizeFactor = 0.55; // Normal gap
+                config.obstacleChance = 0.15; // Occasional obstacles
+                diffDisplayEl.classList.add('text-yellow-400');
+            } else { // Hard
+                config.gapSizeFactor = 0.45; // Narrow gap
+                config.obstacleChance = 0.30; // Frequent obstacles
+                diffDisplayEl.classList.add('text-red-400');
+            }
+        }
+
+        // --- Game Engine ---
+
+        function resize() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+            if(state.screen !== 'playing') {
+                state.shipY = canvas.height / 2;
+                state.targetY = canvas.height / 2;
+            }
+        }
+        window.addEventListener('resize', resize);
+
+        function generateTerrain() {
+            const pointsNeeded = Math.ceil(canvas.width / config.terrainResolution) + 2;
+            if (state.terrainPoints.length === 0) {
+                for (let i = 0; i < pointsNeeded; i++) addTerrainPoint(i * config.terrainResolution);
+            }
+            if (state.terrainPoints.length > 0 && state.terrainPoints[0].x < -config.terrainResolution) {
+                state.terrainPoints.shift();
+            }
+            const lastPoint = state.terrainPoints[state.terrainPoints.length - 1];
+            if (lastPoint.x < canvas.width + config.terrainResolution) {
+                addTerrainPoint(lastPoint.x + config.terrainResolution);
+            }
+        }
+
+        let terrainNoiseOffset = 0;
+        
+        function addTerrainPoint(x) {
+            const isSafeZone = (state.distance + x) < config.safeZoneDistance;
+            let topY, bottomY;
+
+            // --- Terrain Logic ---
+            if (isSafeZone) {
+                const gapSize = canvas.height * 0.7; 
+                const center = canvas.height / 2;
+                topY = center - (gapSize / 2);
+                bottomY = center + (gapSize / 2);
+                terrainNoiseOffset += 0.1; 
+            } else {
+                terrainNoiseOffset += 0.15;
+                const progress = Math.min(state.score / 5000, 1);
+                
+                // Gap size depends on difficulty and progress
+                let currentGapFactor = config.gapSizeFactor - (progress * 0.15); // Gap gets narrower over time
+                currentGapFactor = Math.max(0.25, currentGapFactor); // Min limit
+                
+                const gapSize = canvas.height * currentGapFactor;
+                
+                // Increased deviation for larger curves
+                const deviationAmount = (canvas.height * 0.4) * Math.min(1, 0.2 + progress);
+                
+                const deviation = Math.sin(terrainNoiseOffset) * deviationAmount;
+                const center = (canvas.height / 2) + deviation;
+
+                topY = center - (gapSize / 2);
+                bottomY = center + (gapSize / 2);
+                
+                // --- Obstacle Generation (Only outside safe zone) ---
+                if (Math.random() < config.obstacleChance) {
+                    addObstacle(x, topY, bottomY);
+                }
+            }
+
+            topY = Math.max(10, topY);
+            bottomY = Math.min(canvas.height - 10, bottomY);
+            state.terrainPoints.push({ x, topY, bottomY });
+        }
+
+        function addObstacle(x, topLimit, bottomLimit) {
+            // Determine position between top and bottom
+            const availableHeight = bottomLimit - topLimit;
+            // Leave some padding so obstacle isn't inside the wall
+            const padding = 40; 
+            
+            if (availableHeight < padding * 2) return; // Too tight for obstacles
+
+            const obstacleY = topLimit + padding + Math.random() * (availableHeight - padding * 2);
+            
+            // Randomize size
+            const size = 15 + Math.random() * 20;
+
+            state.obstacles.push({
+                x: x,
+                y: obstacleY,
+                radius: size,
+                rotation: Math.random() * Math.PI * 2,
+                rotSpeed: (Math.random() - 0.5) * 0.1
+            });
+        }
+
+        function updateObstacles() {
+            // Move
+            for (let i = state.obstacles.length - 1; i >= 0; i--) {
+                let obs = state.obstacles[i];
+                obs.x -= config.speed;
+                obs.rotation += obs.rotSpeed;
+
+                // Remove if off screen
+                if (obs.x < -100) {
+                    state.obstacles.splice(i, 1);
+                }
+            }
+        }
+
+        function createParticle(x, y, isEngine = true) {
+            const hue = isEngine ? (Math.random() * 40 + 10) : (Math.random() * 60 + 180); 
+            state.particles.push({
+                x: x, y: y,
+                vx: -config.speed - (Math.random() * 3),
+                vy: (Math.random() - 0.5) * 3,
+                life: 1.0,
+                color: `hsl(${hue}, 100%, ${isEngine ? '60%' : '70%'})`,
+                size: Math.random() * 3 + 1
+            });
+        }
+
+        function drawParticles() {
+            for (let i = state.particles.length - 1; i >= 0; i--) {
+                let p = state.particles[i];
+                p.x += p.vx; p.y += p.vy; p.life -= 0.04;
+                ctx.fillStyle = p.color; ctx.globalAlpha = p.life;
+                ctx.beginPath(); ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2); ctx.fill();
+                if (p.life <= 0) state.particles.splice(i, 1);
+            }
+            ctx.globalAlpha = 1.0;
+        }
+
+        function checkCollision() {
+            const shipX = canvas.width * 0.2;
+            const shipY = state.shipY;
+            const r = config.shipRadius * 0.7; 
+
+            // 1. Terrain Collision
+            for (let i = 0; i < state.terrainPoints.length - 1; i++) {
+                const p1 = state.terrainPoints[i];
+                const p2 = state.terrainPoints[i+1];
+
+                if (p1.x <= shipX + r && p2.x >= shipX - r) {
+                    const t = (shipX - p1.x) / (p2.x - p1.x);
+                    const roofY = p1.topY + (p2.topY - p1.topY) * t;
+                    const floorY = p1.bottomY + (p2.bottomY - p1.bottomY) * t;
+
+                    if (shipY - r < roofY || shipY + r > floorY) return true;
+                }
+            }
+
+            // 2. Obstacle Collision
+            for (let obs of state.obstacles) {
+                // Check if obstacle is near ship horizontally
+                if (obs.x > shipX - 50 && obs.x < shipX + 50) {
+                    const dx = shipX - obs.x;
+                    const dy = shipY - obs.y;
+                    const distance = Math.sqrt(dx*dx + dy*dy);
+                    
+                    // Circle to Circle collision
+                    // Hitbox: ship radius + obstacle radius (slightly smaller for forgiveness)
+                    if (distance < (r + obs.radius * 0.8)) {
+                        return true;
+                    }
+                }
+            }
+
+            return false;
+        }
+
+        function update(timestamp) {
+            if (state.screen !== 'playing') return;
+            state.lastTime = timestamp;
+
+            processAudio();
+            const percent = getPitchPercent(state.currentPitch);
+            
+            pitchBar.style.width = (percent * 100) + '%';
+            freqEl.innerText = Math.round(state.currentPitch) + ' Hz';
+            const noteData = getNoteData(state.currentPitch);
+            noteDisplayEl.innerText = `${noteData.note} ${noteData.solfege}`;
+
+            const padding = canvas.height * 0.1;
+            const usableHeight = canvas.height * 0.8;
+            state.targetY = (canvas.height - padding) - (percent * usableHeight);
+            state.shipY += (state.targetY - state.shipY) * 0.1;
+
+            // Move World
+            for (let p of state.terrainPoints) p.x -= config.speed;
+            generateTerrain();
+            updateObstacles(); // Move obstacles
+
+            state.distance += config.speed;
+            state.score = Math.floor(state.distance / 10);
+            scoreEl.innerText = state.score;
+
+            if (Math.random() > 0.2) createParticle(canvas.width * 0.2 - 20, state.shipY, true);
+
+            draw();
+
+            if (checkCollision()) gameOver();
+            else requestAnimationFrame(update);
+        }
+
+        function draw() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // BG
+            ctx.fillStyle = '#0f172a'; ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // Grid
+            ctx.strokeStyle = 'rgba(56, 189, 248, 0.08)'; ctx.lineWidth = 1;
+            const gridSize = 60; const offset = state.distance % gridSize;
+            for(let x = -offset; x < canvas.width; x += gridSize) {
+                ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, canvas.height); ctx.stroke();
+            }
+            for(let y = 0; y < canvas.height; y += gridSize) {
+                ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(canvas.width, y); ctx.stroke();
+            }
+
+            // Safe Zone
+            if (state.distance < config.safeZoneDistance) {
+                ctx.fillStyle = 'rgba(16, 185, 129, 0.05)'; ctx.fillRect(0,0, canvas.width, canvas.height);
+                ctx.fillStyle = 'rgba(16, 185, 129, 0.5)'; ctx.font = '20px sans-serif'; ctx.textAlign = 'center';
+                ctx.fillText("安全起飛區 (Safe Zone)", canvas.width/2, canvas.height/2 + 100);
+            }
+
+            // Draw Obstacles (Before terrain so they look like they are floating in the tunnel)
+            for (let obs of state.obstacles) {
+                ctx.save();
+                ctx.translate(obs.x, obs.y);
+                ctx.rotate(obs.rotation);
+                
+                // Draw jagged rock
+                ctx.fillStyle = '#94a3b8'; // Rock grey
+                ctx.beginPath();
+                const spikes = 7;
+                for(let i=0; i<spikes * 2; i++){
+                    const r = (i % 2 === 0) ? obs.radius : obs.radius/1.5;
+                    const a = (Math.PI * i) / spikes;
+                    ctx.lineTo(Math.cos(a) * r, Math.sin(a) * r);
+                }
+                ctx.closePath();
+                ctx.fill();
+                
+                // Add a "Core" to make it look dangerous
+                ctx.fillStyle = '#ef4444'; // Red core
+                ctx.beginPath();
+                ctx.arc(0,0, obs.radius * 0.3, 0, Math.PI*2);
+                ctx.fill();
+                
+                ctx.restore();
+            }
+
+            // Terrain
+            ctx.lineWidth = 4;
+            ctx.fillStyle = '#1e293b'; ctx.strokeStyle = '#ef4444'; 
+            ctx.beginPath(); ctx.moveTo(state.terrainPoints[0].x, 0);
+            for (let p of state.terrainPoints) ctx.lineTo(p.x, p.topY);
+            ctx.lineTo(state.terrainPoints[state.terrainPoints.length-1].x, 0); ctx.fill(); ctx.stroke();
+
+            ctx.strokeStyle = '#22c55e';
+            ctx.beginPath(); ctx.moveTo(state.terrainPoints[0].x, canvas.height);
+            for (let p of state.terrainPoints) ctx.lineTo(p.x, p.bottomY);
+            ctx.lineTo(state.terrainPoints[state.terrainPoints.length-1].x, canvas.height); ctx.fill(); ctx.stroke();
+
+            // Ship
+            const shipX = canvas.width * 0.2; const shipY = state.shipY;
+            ctx.save(); ctx.translate(shipX, shipY);
+            const tilt = (state.targetY - state.shipY) * 0.05;
+            ctx.rotate(Math.min(Math.max(tilt, -0.6), 0.6));
+            ctx.fillStyle = '#facc15'; ctx.beginPath(); ctx.moveTo(18, 0); ctx.lineTo(-12, 12); ctx.lineTo(-12, -12); ctx.fill();
+            ctx.fillStyle = '#0ea5e9'; ctx.beginPath(); ctx.arc(-2, 0, 6, 0, Math.PI*2); ctx.fill();
+            ctx.shadowBlur = 20; ctx.shadowColor = '#f59e0b'; ctx.restore();
+
+            drawParticles();
+        }
+
+        // --- Game Flow Control ---
+
+        function startGame() {
+            if (!state.isMicReady) {
+                requestMicAccess().then(success => { if(success) startGame(); });
+                return;
+            }
+            updateVoiceConfig();
+            updateDifficultyConfig(); // Ensure latest difficulty is applied
+
+            document.getElementById('startScreen').classList.add('opacity-0', 'pointer-events-none');
+            document.getElementById('hud').classList.remove('opacity-0');
+            resetGameState();
+            state.screen = 'playing';
+            state.lastTime = performance.now();
+            requestAnimationFrame(update);
+        }
+
+        function returnToTitle() {
+            state.screen = 'start';
+            document.getElementById('gameOverScreen').classList.add('hidden');
+            document.getElementById('startScreen').classList.remove('opacity-0', 'pointer-events-none');
+            document.getElementById('hud').classList.add('opacity-0');
+            requestAnimationFrame(previewLoop);
+        }
+
+        function resetGameState() {
+            resize(); 
+            state.score = 0;
+            state.distance = 0;
+            state.terrainPoints = [];
+            state.obstacles = []; // Clear obstacles
+            state.particles = [];
+            state.shipY = canvas.height / 2;
+            state.targetY = canvas.height / 2;
+            terrainNoiseOffset = 0;
+            generateTerrain();
+        }
+
+        function gameOver() {
+            state.screen = 'gameover';
+            document.getElementById('gameOverScreen').classList.remove('hidden');
+            document.getElementById('hud').classList.add('opacity-0');
+            finalScoreEl.innerText = state.score;
+        }
+
+        function toggleSettings() {
+            document.getElementById('settingsModal').classList.toggle('hidden');
+        }
+
+        function updateSettings() {
+            const thresh = document.getElementById('noiseThreshold').value;
+            const smooth = document.getElementById('smoothing').value;
+            document.getElementById('thresholdVal').innerText = thresh;
+            document.getElementById('smoothVal').innerText = smooth;
+            config.smoothing = parseFloat(smooth);
+        }
+
+        resize();
+        if (navigator.permissions) {
+           navigator.permissions.query({ name: 'microphone' }).then(permissionStatus => {
+               if (permissionStatus.state === 'granted') {}
+           });
+        }
+    </script>
+</body>
+</html>

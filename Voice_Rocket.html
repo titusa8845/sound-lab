@@ -1,0 +1,731 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>大聲公火箭 - 聲音大小聲遊戲</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
+
+        body {
+            font-family: 'Press Start 2P', cursive;
+            background-color: #0f172a;
+            overflow: hidden;
+            touch-action: none;
+            user-select: none;
+        }
+
+        .retro-text {
+            text-shadow: 2px 2px 0px #000;
+        }
+
+        /* 自定義滑塊樣式 */
+        input[type=range] {
+            -webkit-appearance: none;
+            background: transparent;
+        }
+        input[type=range]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            height: 20px;
+            width: 20px;
+            border-radius: 50%;
+            background: #facc15;
+            border: 2px solid #fff;
+            cursor: pointer;
+            margin-top: -8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.5);
+        }
+        input[type=range]::-webkit-slider-runnable-track {
+            width: 100%;
+            height: 6px;
+            cursor: pointer;
+            background: #475569;
+            border-radius: 3px;
+        }
+        
+        /* 難度按鈕選中樣式 */
+        .diff-btn.active {
+            transform: scale(1.05);
+            box-shadow: 0 0 15px rgba(255, 255, 255, 0.5);
+            border-color: white;
+        }
+    </style>
+</head>
+<body class="text-white h-screen w-screen relative">
+
+    <!-- 遊戲畫布 -->
+    <canvas id="gameCanvas" class="block w-full h-full"></canvas>
+
+    <!-- 返回實驗室按鈕 (右上角固定) -->
+    <a href="https://sites.google.com/view/cutedavid/%E9%A6%96%E9%A0%81?authuser=0" class="absolute top-4 right-4 z-[60] bg-slate-700/80 hover:bg-slate-600 text-white text-[10px] sm:text-xs py-2 px-3 rounded border border-slate-500 transition-all retro-text no-underline shadow-lg hover:shadow-xl flex items-center gap-2">
+        <span>🏠</span> 返回萬老師實驗室
+    </a>
+
+    <!-- UI 層：分數與狀態 (遊戲中顯示) -->
+    <div id="gameUI" class="absolute top-4 left-4 z-10 pointer-events-none transition-opacity duration-300 opacity-0">
+        <div class="text-yellow-400 text-xl retro-text mb-2">距離: <span id="scoreDisplay">0</span>m</div>
+        <!-- 新增：遊戲中 dB 顯示 -->
+        <div class="text-green-400 text-sm retro-text">音量: <span id="gameDBDisplay">0</span> dB</div>
+        
+        <!-- 左側即時音量條 (遊戲中) -->
+        <div class="fixed left-4 bottom-24 w-4 h-32 bg-gray-800 border border-gray-600 rounded overflow-hidden">
+            <div id="gameVolumeBar" class="w-full bg-green-500 absolute bottom-0 transition-all duration-75" style="height: 0%"></div>
+            <!-- 閾值線 -->
+            <div id="gameThresholdLine" class="w-full h-0.5 bg-red-500 absolute z-20" style="bottom: 5%"></div>
+        </div>
+    </div>
+
+    <!-- 倒數計時層 -->
+    <div id="countdownLayer" class="absolute inset-0 flex items-center justify-center z-40 pointer-events-none hidden">
+        <div id="countdownText" class="text-8xl text-white retro-text drop-shadow-lg animate-pulse">3</div>
+    </div>
+
+    <!-- 開始/校正畫面 (主選單) -->
+    <div id="startScreen" class="absolute inset-0 bg-slate-900/95 flex flex-col items-center justify-center z-50 overflow-y-auto py-8">
+        <h1 class="text-3xl md:text-5xl text-yellow-400 mb-2 retro-text text-center px-4 mt-8">大聲公火箭</h1>
+        <p class="text-yellow-200 text-xs mb-4 retro-text tracking-widest">by 小萬</p>
+        
+        <!-- 最高紀錄顯示 -->
+        <div class="mb-6 px-4 py-2 bg-yellow-900/50 rounded border border-yellow-700/50">
+            <p class="text-yellow-500 text-xs retro-text text-center">🏆 最高紀錄: <span id="menuHighScore">0</span>m</p>
+        </div>
+        
+        <!-- 第一階段：權限請求 -->
+        <div id="permissionPhase" class="text-center">
+            <button id="initAudioBtn" class="bg-blue-600 hover:bg-blue-500 text-white font-bold py-4 px-8 rounded shadow-[0_4px_0_rgb(30,58,138)] active:shadow-[0_0px_0_rgb(30,58,138)] active:translate-y-1 transition-all text-lg mb-4">
+                開啟麥克風權限
+            </button>
+            <p class="text-gray-400 text-xs">需要麥克風才能控制火箭</p>
+        </div>
+
+        <!-- 第二階段：校正面板 (初始隱藏) -->
+        <div id="calibrationPhase" class="hidden w-full max-w-lg px-6 flex flex-col items-center">
+            
+            <div class="bg-gray-800 p-6 rounded-xl border-2 border-gray-600 w-full mb-8 shadow-2xl">
+                <h3 class="text-green-400 text-center mb-4 text-sm retro-text">難度選擇 (Preset)</h3>
+                
+                <!-- 難度選擇按鈕 -->
+                <div class="flex gap-2 justify-center w-full mb-6">
+                    <button onclick="setDifficulty('easy')" id="btnEasy" class="diff-btn active flex-1 bg-green-600 hover:bg-green-500 text-white py-3 rounded border-2 border-transparent transition-all text-xs sm:text-sm font-bold shadow-[0_4px_0_rgb(21,128,61)] active:translate-y-1 active:shadow-none">
+                        簡單<br><span class="text-[10px] font-normal opacity-80">輕聲細語</span>
+                    </button>
+                    <button onclick="setDifficulty('medium')" id="btnMedium" class="diff-btn flex-1 bg-yellow-600 hover:bg-yellow-500 text-white py-3 rounded border-2 border-transparent transition-all text-xs sm:text-sm font-bold shadow-[0_4px_0_rgb(161,98,7)] active:translate-y-1 active:shadow-none">
+                        中等<br><span class="text-[10px] font-normal opacity-80">正常說話</span>
+                    </button>
+                    <button onclick="setDifficulty('hard')" id="btnHard" class="diff-btn flex-1 bg-red-600 hover:bg-red-500 text-white py-3 rounded border-2 border-transparent transition-all text-xs sm:text-sm font-bold shadow-[0_4px_0_rgb(185,28,28)] active:translate-y-1 active:shadow-none">
+                        困難<br><span class="text-[10px] font-normal opacity-80">用力吶喊</span>
+                    </button>
+                </div>
+
+                <div class="border-t border-gray-600 my-4 w-full"></div>
+
+                <!-- 視覺化音量條 -->
+                <div class="flex items-end justify-center h-24 space-x-1 mb-2 bg-gray-900 rounded p-4 relative overflow-hidden border border-gray-700">
+                    <div id="calibrationBar" class="w-16 bg-green-500 rounded-t transition-all duration-75 mx-auto z-10" style="height: 5%"></div>
+                    <!-- 閾值線視覺化 -->
+                    <div id="calibThresholdLine" class="absolute w-full border-b-2 border-red-500 border-dashed z-20" style="bottom: 5%">
+                        <span class="absolute right-2 -top-6 text-xs text-red-400">觸發線</span>
+                    </div>
+                    <!-- 新增：校正階段 dB 顯示 -->
+                    <div class="absolute inset-0 flex items-center justify-center pointer-events-none z-30 flex-col">
+                        <span id="calibDBDisplay" class="text-xl font-bold retro-text text-white drop-shadow-md">0 dB</span>
+                        <span id="testMsg" class="text-[10px] text-gray-400 opacity-70 mt-1">即時音量</span>
+                    </div>
+                </div>
+                
+                <!-- 控制滑桿 -->
+                <div class="space-y-4 mt-4">
+                    <!-- 靈敏度 -->
+                    <div>
+                        <div class="flex justify-between text-xs text-gray-300 mb-1">
+                            <span>推力靈敏度 (Sensitivity)</span>
+                            <span id="sensValue" class="text-yellow-400">4.0</span>
+                        </div>
+                        <input type="range" id="sensitivitySlider" min="1.0" max="10.0" step="0.1" value="4.0">
+                    </div>
+
+                    <!-- 降噪 -->
+                    <div>
+                        <div class="flex justify-between text-xs text-gray-300 mb-1">
+                            <span>降噪門檻 (Noise Gate)</span>
+                            <span id="noiseValue" class="text-red-400">5%</span>
+                        </div>
+                        <input type="range" id="noiseGateSlider" min="0" max="60" step="1" value="5">
+                    </div>
+                </div>
+            </div>
+
+            <button id="startBtn" class="bg-blue-600 hover:bg-blue-500 text-white font-bold py-4 px-12 rounded shadow-[0_4px_0_rgb(30,58,138)] active:shadow-[0_0px_0_rgb(30,58,138)] active:translate-y-1 transition-all text-xl w-full md:w-auto animate-bounce">
+                發射火箭 (LAUNCH)
+            </button>
+            <p class="text-gray-500 text-xs mt-4">3秒倒數後，利用聲音控制高度</p>
+        </div>
+        
+        <p id="statusMsg" class="mt-4 text-red-400 text-sm h-6"></p>
+    </div>
+
+    <!-- 遊戲結束 遮罩 -->
+    <div id="gameOverScreen" class="hidden absolute inset-0 bg-red-900/95 flex flex-col items-center justify-center z-50">
+        <h2 class="text-4xl text-white mb-2 retro-text">墜毀!</h2>
+        <p class="text-xl text-yellow-300 mb-2">本次距離: <span id="finalScore">0</span>m</p>
+        <p class="text-sm text-yellow-500/80 mb-8 retro-text">🏆 最高紀錄: <span id="finalBestScore">0</span>m</p>
+        
+        <div class="flex gap-4">
+            <button id="menuBtn" class="bg-gray-600 hover:bg-gray-500 text-white font-bold py-3 px-6 rounded shadow-[0_4px_0_rgb(75,85,99)] active:translate-y-1 transition-all">
+                回到設定
+            </button>
+            <button id="quickRestartBtn" class="bg-green-600 hover:bg-green-500 text-white font-bold py-3 px-6 rounded shadow-[0_4px_0_rgb(21,128,61)] active:translate-y-1 transition-all">
+                直接重試
+            </button>
+        </div>
+    </div>
+
+    <script>
+        // --- 遊戲常數 ---
+        const GAME_SPEED_INITIAL = 3;
+        const GRAVITY = 0.35; 
+        const MAX_THRUST = -1.2; 
+        const TERRAIN_SEGMENT_WIDTH = 20;
+        
+        // --- 難度設定 ---
+        const DIFFICULTIES = {
+            easy: { sens: 4.0, gate: 0.05 },
+            medium: { sens: 2.5, gate: 0.10 },
+            hard: { sens: 1.2, gate: 0.15 }
+        };
+
+        // --- 全域變數 ---
+        let canvas, ctx;
+        let width, height;
+        let animationId;
+        
+        // 遊戲狀態
+        let gameState = 'MENU'; 
+        let score = 0;
+        let highScore = parseInt(localStorage.getItem('rocketHighScore')) || 0; 
+        let gameSpeed = GAME_SPEED_INITIAL;
+        let particles = [];
+        let countdownValue = 3;
+        let countdownTimer = null;
+
+        // 音訊變數
+        let audioContext;
+        let analyser;
+        let dataArray;
+        let currentVolume = 0;
+
+        // 設定變數 (預設簡單)
+        let sensitivity = DIFFICULTIES.easy.sens; 
+        let noiseGate = DIFFICULTIES.easy.gate;
+
+        // DOM 元素
+        const scoreDisplay = document.getElementById('scoreDisplay');
+        const gameDBDisplay = document.getElementById('gameDBDisplay'); // 新增
+        const calibDBDisplay = document.getElementById('calibDBDisplay'); // 新增
+        
+        const startScreen = document.getElementById('startScreen');
+        const permissionPhase = document.getElementById('permissionPhase');
+        const calibrationPhase = document.getElementById('calibrationPhase');
+        const gameOverScreen = document.getElementById('gameOverScreen');
+        const gameUI = document.getElementById('gameUI');
+        const countdownLayer = document.getElementById('countdownLayer');
+        const countdownText = document.getElementById('countdownText');
+        
+        const menuHighScore = document.getElementById('menuHighScore');
+        const finalBestScore = document.getElementById('finalBestScore');
+        
+        // 按鈕
+        const initAudioBtn = document.getElementById('initAudioBtn');
+        const startBtn = document.getElementById('startBtn');
+        const menuBtn = document.getElementById('menuBtn');
+        const quickRestartBtn = document.getElementById('quickRestartBtn');
+        
+        // 校正 UI
+        const calibrationBar = document.getElementById('calibrationBar');
+        const calibThresholdLine = document.getElementById('calibThresholdLine');
+        const gameVolumeBar = document.getElementById('gameVolumeBar');
+        const gameThresholdLine = document.getElementById('gameThresholdLine');
+        const sensSlider = document.getElementById('sensitivitySlider');
+        const noiseSlider = document.getElementById('noiseGateSlider');
+        const sensValue = document.getElementById('sensValue');
+        const noiseValue = document.getElementById('noiseValue');
+        const statusMsg = document.getElementById('statusMsg');
+
+        // --- 難度設定函式 ---
+        window.setDifficulty = function(level) {
+            // 更新變數
+            sensitivity = DIFFICULTIES[level].sens;
+            noiseGate = DIFFICULTIES[level].gate;
+            
+            // 更新 UI 滑桿
+            sensSlider.value = sensitivity;
+            sensValue.textContent = sensitivity.toFixed(1);
+            noiseSlider.value = noiseGate * 100;
+            noiseValue.textContent = (noiseGate * 100) + "%";
+            calibThresholdLine.style.bottom = (noiseGate * 100) + "%";
+            gameThresholdLine.style.bottom = (noiseGate * 100) + "%";
+
+            // 更新按鈕樣式
+            ['easy', 'medium', 'hard'].forEach(l => {
+                const btn = document.getElementById('btn' + l.charAt(0).toUpperCase() + l.slice(1));
+                if (l === level) {
+                    btn.classList.add('active');
+                } else {
+                    btn.classList.remove('active');
+                }
+            });
+        };
+
+        // --- 類別定義 ---
+
+        class Rocket {
+            constructor() {
+                this.x = width * 0.2;
+                this.y = height / 3; 
+                this.radius = 15;
+                this.velocity = 0;
+                this.hoverOffset = 0;
+                this.hoverSpeed = 0.05;
+            }
+
+            update(volumeInput, isHovering) {
+                if (isHovering) {
+                    this.hoverOffset += this.hoverSpeed;
+                    this.y = (height / 3) + Math.sin(this.hoverOffset) * 20;
+                    this.velocity = 0;
+                    if(Math.random() > 0.5) this.createParticles(0.5); 
+                    return;
+                }
+
+                this.velocity += GRAVITY;
+
+                if (volumeInput > noiseGate) {
+                    let effectiveVol = (volumeInput - noiseGate) / (1 - noiseGate);
+                    let thrust = effectiveVol * MAX_THRUST * sensitivity; 
+                    if (thrust < -18) thrust = -18; 
+                    this.velocity += thrust;
+                    this.createParticles(1.0);
+                }
+
+                if (this.velocity > 10) this.velocity = 10;
+                if (this.velocity < -10) this.velocity = -10;
+
+                this.y += this.velocity;
+
+                if (this.y < this.radius) {
+                    this.y = this.radius;
+                    this.velocity = 0;
+                }
+            }
+
+            draw() {
+                ctx.save();
+                ctx.translate(this.x, this.y);
+                
+                let angle = Math.min(Math.PI / 4, Math.max(-Math.PI / 4, (this.velocity * 0.1)));
+                if(gameState === 'COUNTDOWN') angle = 0; 
+                ctx.rotate(angle);
+
+                ctx.fillStyle = '#e2e8f0';
+                ctx.beginPath();
+                ctx.ellipse(0, 0, 20, 10, 0, 0, Math.PI * 2);
+                ctx.fill();
+
+                ctx.fillStyle = '#ef4444';
+                ctx.beginPath();
+                ctx.moveTo(-10, 0);
+                ctx.lineTo(-25, -10);
+                ctx.lineTo(-25, 10);
+                ctx.fill();
+
+                ctx.fillStyle = '#38bdf8';
+                ctx.beginPath();
+                ctx.arc(5, -2, 4, 0, Math.PI * 2);
+                ctx.fill();
+
+                ctx.restore();
+            }
+
+            createParticles(scale) {
+                for(let i=0; i<2; i++) {
+                    particles.push(new Particle(this.x - 20, this.y + (Math.random()*10 - 5), scale));
+                }
+            }
+        }
+
+        class Particle {
+            constructor(x, y, scale = 1) {
+                this.x = x;
+                this.y = y;
+                this.size = (Math.random() * 5 + 2) * scale;
+                this.speedX = (-Math.random() * 3 - 2) * scale;
+                this.speedY = (Math.random() * 2 - 1) * scale;
+                this.color = `hsla(${Math.random()*30 + 10}, 100%, 50%, 0.8)`;
+                this.life = 1.0;
+            }
+            update() {
+                this.x += this.speedX;
+                this.y += this.speedY;
+                this.life -= 0.05;
+            }
+            draw() {
+                ctx.fillStyle = this.color;
+                ctx.globalAlpha = Math.max(0, this.life);
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.size, 0, Math.PI*2);
+                ctx.fill();
+                ctx.globalAlpha = 1.0;
+            }
+        }
+
+        class Terrain {
+            constructor() {
+                this.points = [];
+                this.segmentWidth = TERRAIN_SEGMENT_WIDTH;
+                this.offsetX = 0;
+                this.restCounter = 0; 
+                
+                for (let i = 0; i < (width / this.segmentWidth) + 20; i++) {
+                    this.points.push({
+                        x: i * this.segmentWidth,
+                        y: height - 50 
+                    });
+                }
+            }
+
+            update(isMoving) {
+                if (!isMoving) return;
+
+                this.offsetX -= gameSpeed;
+                for (let p of this.points) {
+                    p.x -= gameSpeed;
+                }
+
+                if (this.points[0].x < -this.segmentWidth) {
+                    this.points.shift();
+                    
+                    let lastPoint = this.points[this.points.length - 1];
+                    let newY;
+
+                    if (this.restCounter > 0) {
+                        this.restCounter--;
+                        let targetY = height - 50;
+                        if (lastPoint.y < targetY - 10) {
+                            newY = lastPoint.y + (Math.random() * 3 + 5);
+                        } else {
+                            newY = targetY + (Math.random() * 6 - 3);
+                        }
+                    } else {
+                        let difficulty = Math.min(50, 18 + score * 0.04) * 0.8; 
+                        let change = (Math.random() * difficulty * 2) - difficulty;
+
+                        if (Math.random() < 0.08 && lastPoint.y > height * 0.4) {
+                            change -= 25; 
+                        }
+
+                        newY = lastPoint.y + change;
+                        
+                        let maxMountainHeight = height * 0.3; 
+                        if (newY < maxMountainHeight) newY = maxMountainHeight; 
+                        if (newY > height - 20) newY = height - 20;
+
+                        if (newY < height * 0.45) {
+                            this.restCounter = Math.floor(30 + Math.random() * 30);
+                        }
+                    }
+
+                    this.points.push({
+                        x: lastPoint.x + this.segmentWidth,
+                        y: newY
+                    });
+                }
+            }
+
+            draw() {
+                ctx.fillStyle = '#1e293b';
+                ctx.strokeStyle = '#22c55e';
+                ctx.lineWidth = 3;
+
+                ctx.beginPath();
+                ctx.moveTo(this.points[0].x, height);
+                ctx.lineTo(this.points[0].x, this.points[0].y);
+
+                for (let i = 1; i < this.points.length; i++) {
+                     let p = this.points[i];
+                     let prevP = this.points[i-1];
+                     let cpX = (prevP.x + p.x) / 2;
+                     let cpY = (prevP.y + p.y) / 2;
+                     ctx.quadraticCurveTo(prevP.x, prevP.y, cpX, cpY);
+                }
+                
+                let lastP = this.points[this.points.length-1];
+                ctx.lineTo(lastP.x, lastP.y);
+
+                ctx.lineTo(this.points[this.points.length-1].x, height);
+                ctx.closePath();
+                ctx.fill();
+                ctx.stroke();
+            }
+
+            checkCollision(rocket) {
+                let hitRadius = rocket.radius * 0.8; 
+
+                for (let i = 0; i < this.points.length - 1; i++) {
+                    let p1 = this.points[i];
+                    let p2 = this.points[i+1];
+
+                    if (rocket.x >= p1.x && rocket.x <= p2.x) {
+                        let t = (rocket.x - p1.x) / (p2.x - p1.x);
+                        let groundY = p1.y + t * (p2.y - p1.y);
+
+                        if (rocket.y + hitRadius > groundY) return true;
+                        if (rocket.y > height) return true;
+                        return false;
+                    }
+                }
+                return false;
+            }
+        }
+
+        // --- 初始化與事件 ---
+
+        function init() {
+            canvas = document.getElementById('gameCanvas');
+            ctx = canvas.getContext('2d');
+            resize();
+            window.addEventListener('resize', resize);
+            
+            menuHighScore.textContent = Math.floor(highScore);
+
+            sensSlider.addEventListener('input', (e) => {
+                sensitivity = parseFloat(e.target.value);
+                sensValue.textContent = sensitivity.toFixed(1);
+                document.querySelectorAll('.diff-btn').forEach(btn => btn.classList.remove('active'));
+            });
+
+            noiseSlider.addEventListener('input', (e) => {
+                let val = parseInt(e.target.value);
+                noiseGate = val / 100;
+                noiseValue.textContent = val + "%";
+                calibThresholdLine.style.bottom = val + "%";
+                gameThresholdLine.style.bottom = val + "%";
+                document.querySelectorAll('.diff-btn').forEach(btn => btn.classList.remove('active'));
+            });
+
+            initAudioBtn.addEventListener('click', requestAudioAccess);
+            startBtn.addEventListener('click', startCountdown);
+            menuBtn.addEventListener('click', returnToMenu);
+            quickRestartBtn.addEventListener('click', startCountdown); 
+
+            ctx.fillStyle = '#0f172a';
+            ctx.fillRect(0, 0, width, height);
+        }
+
+        function resize() {
+            width = window.innerWidth;
+            height = window.innerHeight;
+            canvas.width = width;
+            canvas.height = height;
+        }
+
+        async function requestAudioAccess() {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+                window.AudioContext = window.AudioContext || window.webkitAudioContext;
+                audioContext = new AudioContext();
+                analyser = audioContext.createAnalyser();
+                const source = audioContext.createMediaStreamSource(stream);
+                source.connect(analyser);
+                analyser.fftSize = 256;
+                dataArray = new Uint8Array(analyser.frequencyBinCount);
+                
+                permissionPhase.classList.add('hidden');
+                calibrationPhase.classList.remove('hidden');
+                
+                animateCalibration();
+                
+            } catch (err) {
+                console.error(err);
+                statusMsg.textContent = "無法取得麥克風權限，請重整頁面並允許。";
+            }
+        }
+
+        function getVolume() {
+            if (!analyser) return 0;
+            analyser.getByteFrequencyData(dataArray);
+            let sum = 0;
+            for(let i = 0; i < dataArray.length; i++) sum += dataArray[i];
+            return (sum / dataArray.length) / 255; 
+        }
+
+        // --- dB 計算函式 (模擬) ---
+        function calculateDB(vol) {
+            // 防止 log(0)
+            if (vol <= 0.0001) return 0;
+            
+            // 模擬 dB 公式：將 0~1 的線性音量轉換為 0~100+ 的分貝數
+            // 20 * log10(vol) 會得到負值 (如 -60 ~ 0)
+            // 我們加上 100 作為基準偏移量
+            // 1.0 (最大聲) -> 100 dB
+            // 0.1 -> 80 dB
+            // 0.01 -> 60 dB
+            // 0.001 -> 40 dB
+            let db = 100 + (20 * Math.log10(vol));
+            return Math.max(0, Math.floor(db));
+        }
+
+        // --- 遊戲流程控制 ---
+
+        let rocket, terrain;
+
+        function animateCalibration() {
+            if (gameState !== 'MENU') return;
+            
+            let vol = getVolume();
+            let db = calculateDB(vol);
+            
+            // 更新 UI
+            calibrationBar.style.height = (vol * 100) + "%";
+            calibDBDisplay.textContent = db + " dB"; // 更新數字
+            
+            if (vol > noiseGate) {
+                calibrationBar.classList.add('bg-green-400');
+                calibrationBar.classList.remove('bg-green-600');
+            } else {
+                calibrationBar.classList.add('bg-green-600');
+                calibrationBar.classList.remove('bg-green-400');
+            }
+
+            requestAnimationFrame(animateCalibration);
+        }
+
+        function startCountdown() {
+            startScreen.classList.add('hidden');
+            gameOverScreen.classList.add('hidden');
+            gameUI.classList.remove('opacity-0'); 
+            
+            if (animationId) cancelAnimationFrame(animationId);
+            if (countdownTimer) clearInterval(countdownTimer);
+
+            rocket = new Rocket();
+            terrain = new Terrain();
+            particles = [];
+            score = 0;
+            gameSpeed = GAME_SPEED_INITIAL;
+            
+            gameState = 'COUNTDOWN';
+            countdownValue = 3;
+            countdownLayer.classList.remove('hidden');
+            countdownText.textContent = countdownValue;
+            
+            animate();
+
+            countdownTimer = setInterval(() => {
+                countdownValue--;
+                if (countdownValue > 0) {
+                    countdownText.textContent = countdownValue;
+                } else {
+                    clearInterval(countdownTimer);
+                    countdownLayer.classList.add('hidden');
+                    gameState = 'PLAYING';
+                }
+            }, 1000);
+        }
+
+        function gameOver() {
+            gameState = 'GAMEOVER';
+            gameUI.classList.add('opacity-0');
+            
+            let currentFinalScore = Math.floor(score);
+            document.getElementById('finalScore').textContent = currentFinalScore;
+            
+            if (currentFinalScore > highScore) {
+                highScore = currentFinalScore;
+                localStorage.setItem('rocketHighScore', highScore);
+            }
+            document.getElementById('finalBestScore').textContent = highScore;
+            document.getElementById('menuHighScore').textContent = highScore;
+
+            gameOverScreen.classList.remove('hidden');
+            gameOverScreen.classList.add('flex');
+        }
+
+        function returnToMenu() {
+            gameState = 'MENU';
+            gameOverScreen.classList.add('hidden');
+            startScreen.classList.remove('hidden');
+            
+            if (countdownTimer) clearInterval(countdownTimer);
+            if (animationId) cancelAnimationFrame(animationId);
+
+            animateCalibration();
+        }
+
+        function animate() {
+            ctx.fillStyle = '#0f172a';
+            ctx.fillRect(0, 0, width, height);
+
+            ctx.fillStyle = '#ffffff';
+            for(let i=0; i<5; i++) {
+                ctx.fillRect(Math.random()*width, Math.random()*height, 1, 1);
+            }
+
+            if (gameState === 'GAMEOVER') {
+                rocket.draw();
+                terrain.draw();
+                return; 
+            }
+            
+            currentVolume = getVolume();
+            let db = calculateDB(currentVolume);
+
+            // 更新遊戲中 dB
+            gameDBDisplay.textContent = db;
+            
+            if (gameState === 'PLAYING' || gameState === 'COUNTDOWN') {
+                gameVolumeBar.style.height = (currentVolume * 100) + "%";
+                if (currentVolume > noiseGate) {
+                    gameVolumeBar.classList.add('bg-green-400');
+                    gameVolumeBar.classList.remove('bg-green-600');
+                } else {
+                    gameVolumeBar.classList.add('bg-green-600');
+                    gameVolumeBar.classList.remove('bg-green-400');
+                }
+            }
+
+            if (gameState === 'COUNTDOWN') {
+                rocket.update(currentVolume, true); 
+                terrain.update(false); 
+            } else if (gameState === 'PLAYING') {
+                rocket.update(currentVolume, false);
+                terrain.update(true);
+
+                if (terrain.checkCollision(rocket)) {
+                    gameOver();
+                }
+                
+                score += gameSpeed / 10;
+                scoreDisplay.textContent = Math.floor(score);
+                if (score % 100 === 0) gameSpeed += 0.005;
+            }
+
+            for (let i = particles.length - 1; i >= 0; i--) {
+                particles[i].update();
+                if (particles[i].life <= 0) particles.splice(i, 1);
+            }
+
+            terrain.draw();
+            particles.forEach(p => p.draw());
+            rocket.draw();
+
+            if (gameState !== 'MENU') {
+                animationId = requestAnimationFrame(animate);
+            }
+        }
+
+        init();
+
+    </script>
+</body>
+</html>
