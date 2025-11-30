@@ -1,0 +1,1635 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>樂器與樂理實驗室 v2.5.4</title>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- React & ReactDOM -->
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+    
+    <!-- Babel for JSX -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+    <style>
+        /* 自定義動畫與樣式 */
+        .shadow-glow { box-shadow: 0 0 10px rgba(255, 0, 0, 0.8); }
+        @keyframes fade-in { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        .animate-fade-in { animation: fade-in 0.3s ease-out forwards; }
+        
+        /* 側邊欄捲軸樣式 */
+        aside::-webkit-scrollbar { width: 4px; }
+        aside::-webkit-scrollbar-track { background: transparent; }
+        aside::-webkit-scrollbar-thumb { background: #e5e7eb; border-radius: 2px; }
+
+        /* 禁止選取文字，提升操作體驗 */
+        .select-none { user-select: none; -webkit-user-select: none; }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect, useRef, useCallback, useMemo } = React;
+
+        // --- 內建圖示組件 (解決 CDN 依賴問題) ---
+        const IconBase = ({ children, size = 24, className = "", ...props }) => (
+            <svg 
+                xmlns="http://www.w3.org/2000/svg" 
+                width={size} 
+                height={size} 
+                viewBox="0 0 24 24" 
+                fill="none" 
+                stroke="currentColor" 
+                strokeWidth="2" 
+                strokeLinecap="round" 
+                strokeLinejoin="round" 
+                className={className}
+                {...props}
+            >
+                {children}
+            </svg>
+        );
+
+        const Volume2 = (props) => <IconBase {...props}><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" /><path d="M15.54 8.46a5 5 0 0 1 0 7.07" /><path d="M19.07 4.93a10 10 0 0 1 0 14.14" /></IconBase>;
+        const Wind = (props) => <IconBase {...props}><path d="M17.7 7.7a2.5 2.5 0 1 1 1.8 4.3H2" /><path d="M9.6 4.6A2 2 0 1 1 11 8H2" /><path d="M12.6 19.4A2 2 0 1 0 14 16H2" /></IconBase>;
+        const Music = (props) => <IconBase {...props}><path d="M9 18V5l12-2v13" /><circle cx="6" cy="18" r="3" /><circle cx="18" cy="16" r="3" /></IconBase>;
+        const Info = (props) => <IconBase {...props}><circle cx="12" cy="12" r="10" /><path d="M12 16v-4" /><path d="M12 8h.01" /></IconBase>;
+        const RotateCcw = (props) => <IconBase {...props}><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" /><path d="M3 3v5h5" /></IconBase>;
+        const RotateCw = (props) => <IconBase {...props}><path d="M21 12a9 9 0 1 1-9-9 9.75 9.75 0 0 1 6.74 2.74L21 8" /><path d="M21 3v5h-5" /></IconBase>;
+        const RefreshCw = (props) => <IconBase {...props}><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8" /><path d="M21 3v5h-5" /><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16" /><path d="M8 16H3v5" /></IconBase>;
+        const Activity = (props) => <IconBase {...props}><path d="M22 12h-4l-3 9L9 3l-3 9H2" /></IconBase>;
+        const Waves = (props) => <IconBase {...props}><path d="M2 6c.6.5 1.2 1 2.5 1C7 7 7 5 9.5 5c2.6 0 2.4 2 5 2 2.5 0 2.5-2 5-2 1.3 0 1.9.5 2.5 1" /><path d="M2 12c.6.5 1.2 1 2.5 1 2.5 0 2.5-2 5-2 2.6 0 2.4 2 5 2 2.5 0 2.5-2 5-2 1.3 0 1.9.5 2.5 1" /><path d="M2 18c.6.5 1.2 1 2.5 1 2.5 0 2.5-2 5-2 2.6 0 2.4 2 5 2 2.5 0 2.5-2 5-2 1.3 0 1.9.5 2.5 1" /></IconBase>;
+        const Mic = (props) => <IconBase {...props}><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z" /><path d="M19 10v2a7 7 0 0 1-14 0v-2" /><line x1="12" y1="19" x2="12" y2="23" /><line x1="8" y1="23" x2="16" y2="23" /></IconBase>;
+        const MicOff = (props) => <IconBase {...props}><line x1="1" y1="1" x2="23" y2="23" /><path d="M9 9v3a3 3 0 0 0 5.12 2.12" /><line x1="15" y1="9.34" x2="15" y2="4a3 3 0 0 0-5.94-.6" /><path d="M17 16.95A7 7 0 0 1 5 12v-2" /><line x1="12" y1="19" x2="12" y2="23" /><line x1="8" y1="23" x2="16" y2="23" /></IconBase>;
+        const Piano = (props) => <IconBase {...props}><path d="M2 6a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V6z" /><path d="M6 18V6" /><path d="M10 18V6" /><path d="M14 18V6" /><path d="M18 18V6" /><path d="M6 12h4" /><path d="M14 12h4" /></IconBase>;
+        const GraduationCap = (props) => <IconBase {...props}><path d="M22 10v6M2 10l10-5 10 5-10 5z" /><path d="M6 12v5c3 3 9 3 12 0v-5" /></IconBase>;
+        const Play = (props) => <IconBase {...props}><polygon points="5 3 19 12 5 21 5 3" /></IconBase>;
+        const CheckCircle = (props) => <IconBase {...props}><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" /><polyline points="22 4 12 14.01 9 11.01" /></IconBase>;
+        const XCircle = (props) => <IconBase {...props}><circle cx="12" cy="12" r="10" /><line x1="15" y1="9" x2="9" y2="15" /><line x1="9" y1="9" x2="15" y2="15" /></IconBase>;
+        const Trophy = (props) => <IconBase {...props}><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6" /><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18" /><path d="M4 22h16" /><path d="M10 14.66V17" /><path d="M14 14.66V17" /><path d="M6.76 4a2 2 0 0 0-2.18 1.58L2.91 12.16A5 5 0 0 0 7.91 18H16.09a5 5 0 0 0 5-6.58l-1.67-6.58A2 2 0 0 0 17.24 4Z" /><path d="M12 4v2" /></IconBase>;
+        const Sliders = (props) => <IconBase {...props}><line x1="4" y1="21" x2="4" y2="14" /><line x1="4" y1="10" x2="4" y2="3" /><line x1="12" y1="21" x2="12" y2="12" /><line x1="12" y1="8" x2="12" y2="3" /><line x1="20" y1="21" x2="20" y2="16" /><line x1="20" y1="12" x2="20" y2="3" /><line x1="1" y1="14" x2="7" y2="14" /><line x1="9" y1="8" x2="15" y2="8" /><line x1="17" y1="16" x2="23" y2="16" /></IconBase>;
+        const History = (props) => <IconBase {...props}><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" /><path d="M3 3v5h5" /><path d="M12 7v5l4 2" /></IconBase>;
+        const X = (props) => <IconBase {...props}><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></IconBase>;
+        const Clock = (props) => <IconBase {...props}><circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" /></IconBase>;
+        const HelpCircle = (props) => <IconBase {...props}><circle cx="12" cy="12" r="10" /><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3" /><line x1="12" y1="17" x2="12.01" y2="17" /></IconBase>;
+
+
+        // --- 版本紀錄資料 ---
+        const VERSION_HISTORY = [
+          { ver: "2.5.4", date: "2024-05-23", content: "體驗優化：調整調音器與音準教練的「降噪閾值」範圍 (0.001~0.2)，預設值設為 0.02，提供更靈敏的聲音偵測能力，解決降噪過強問題。" },
+          { ver: "2.5.3", date: "2024-05-23", content: "音色優化：改良虛擬鋼琴音色演算法，使用更豐富的泛音與更自然的 ADSR 包絡線，提升聽覺真實感。" },
+          { ver: "2.5.2", date: "2024-05-23", content: "緊急修復：修正 CDN 載入錯誤 (Lucide Icons)，將圖示改為內建 SVG 元件，確保離線或跨網域環境下的穩定性。" },
+          { ver: "2.5.1", date: "2024-05-23", content: "系統維護：修復組件重複宣告錯誤；將小提琴圖形標準化為 SVG 向量繪圖以確保跨裝置相容性；優化音訊引擎資源釋放邏輯。" },
+          { ver: "2.5.0", date: "2024-05-23", content: "新功能：直笛模擬器新增「中音直笛 (Alto)」模式，模擬 F 調樂器特性，支援真實 F 大調指法與管長物理模擬。" },
+          { ver: "2.4.0", date: "2024-05-23", content: "修正優化：直笛模擬器預設改為「全開孔」狀態；修正孔位物理參數以對應高音直笛 (Soprano) 的 C 大調音階 (C5-C6)。" },
+          { ver: "2.3.0", date: "2024-05-23", content: "功能擴充：節拍器大幅升級，新增 3/8, 9/8, 12/8 (複拍子) 與 2/2, 3/2, 4/2 (二分拍) 模式，並加入 BPM 專業術語說明。" },
+          { ver: "2.2.0", date: "2024-05-23", content: "功能擴充：節拍器新增「6/8 拍」複拍子模式，支援「強-弱-弱-次強-弱-弱」的專業節奏律動。" },
+          { ver: "2.1.0", date: "2024-05-23", content: "新功能：專業節拍器 (Metronome)，支援多種音色(鼓聲/木魚/電子)、BPM調整與拍號教學。" },
+          { ver: "2.0.0", date: "2024-05-23", content: "系統整合：修復代碼衝突錯誤，整合所有實驗室功能，新增版本紀錄顯示。" },
+          { ver: "1.9.0", date: "2024-05-23", content: "功能優化：調音器與音準教練新增「降噪閾值」調整；實作音訊互斥邏輯（播放時關閉麥克風），防止回授干擾。" },
+          { ver: "1.8.0", date: "2024-05-23", content: "視覺更新：小提琴模擬器改用高精細 SVG 電腦繪圖，重現真實木紋質感與琴身曲線。" },
+          { ver: "1.7.0", date: "2024-05-23", content: "視覺更新：直笛模擬器孔洞修正為真實樣式（下方兩孔改為大小雙孔設計）。" },
+          { ver: "1.6.0", date: "2024-05-23", content: "新功能：音準教練 (Pitch Trainer)，提供自由練習與評分挑戰模式，透過麥克風互動評分。" },
+          { ver: "1.5.0", date: "2024-05-23", content: "新功能：調音大師 (Tuner Master)，包含 88 鍵虛擬鋼琴與視覺化麥克風調音器。" },
+          { ver: "1.4.0", date: "2024-05-23", content: "新功能：拍音實驗室 (Beat Simulator)，視覺化波形疊加原理，演示拍頻現象。" },
+          { ver: "1.3.0", date: "2024-05-23", content: "體驗優化：介面改為左側導航欄佈局；小提琴張力調整改為按鈕式微調。" },
+          { ver: "1.2.0", date: "2024-05-23", content: "功能增強：新增即時頻率偵測與音名/唱名顯示功能。" },
+          { ver: "1.1.0", date: "2024-05-23", content: "核心優化：升級 Web Audio API 引擎，支援多振盪器與 ADSR 包絡線。" },
+          { ver: "1.0.0", date: "2024-05-23", content: "初版發布：弦樂器（小提琴）與管樂器（直笛）物理模擬實驗室。" },
+        ];
+
+        // --- 工具函式：頻率轉音名與唱名 ---
+        const getNoteInfo = (frequency) => {
+          if (!frequency || frequency <= 0) return { name: '-', solfege: '-', cents: 0, frequency: 0 };
+          
+          const A4 = 440;
+          const semitones = 12 * Math.log2(frequency / A4);
+          const midiRounded = Math.round(semitones) + 69;
+          const semitonesExact = 12 * Math.log2(frequency / A4);
+          const cents = (semitonesExact - Math.round(semitonesExact)) * 100;
+
+          const noteNames = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+          const solfegeNames = ['Do', 'Do#', 'Re', 'Re#', 'Mi', 'Fa', 'Fa#', 'Sol', 'Sol#', 'La', 'La#', 'Si'];
+          
+          const octave = Math.floor(midiRounded / 12) - 1;
+          const noteIndex = midiRounded % 12;
+          const safeIndex = (noteIndex + 12) % 12; 
+
+          return {
+            name: `${noteNames[safeIndex]}${octave}`,
+            solfege: solfegeNames[safeIndex],
+            cents: cents,
+            frequency: frequency,
+            midi: midiRounded
+          };
+        };
+
+        // --- 工具函式：產生隨機題目 (範圍 C3 ~ E5) ---
+        const generateRandomNote = () => {
+            const minMidi = 48; // C3
+            const maxMidi = 76; // E5
+            const midi = Math.floor(Math.random() * (maxMidi - minMidi + 1)) + minMidi;
+            const frequency = 440 * Math.pow(2, (midi - 69) / 12);
+            const info = getNoteInfo(frequency);
+            return { ...info, targetMidi: midi, targetFreq: frequency };
+        };
+
+        // --- 自定義 Hook：音訊引擎 ---
+        const useAudioEngine = () => {
+          const audioContextRef = useRef(null);
+          const oscillatorRef = useRef(null); 
+          const gainNodeRef = useRef(null);
+          const osc1Ref = useRef(null);
+          const osc2Ref = useRef(null);
+          const gain1Ref = useRef(null);
+          const gain2Ref = useRef(null);
+
+          const init = useCallback(() => {
+            if (!audioContextRef.current) {
+              const AudioContext = window.AudioContext || window.webkitAudioContext;
+              audioContextRef.current = new AudioContext();
+              
+              gainNodeRef.current = audioContextRef.current.createGain();
+              gainNodeRef.current.connect(audioContextRef.current.destination);
+              gainNodeRef.current.gain.value = 0;
+
+              gain1Ref.current = audioContextRef.current.createGain();
+              gain2Ref.current = audioContextRef.current.createGain();
+              gain1Ref.current.connect(audioContextRef.current.destination);
+              gain2Ref.current.connect(audioContextRef.current.destination);
+              gain1Ref.current.gain.value = 0;
+              gain2Ref.current.gain.value = 0;
+            }
+            if (audioContextRef.current.state === 'suspended') {
+              audioContextRef.current.resume();
+            }
+          }, []);
+
+          const playTone = useCallback((frequency, type = 'sine', volume = 0.5) => {
+            init();
+            if (!audioContextRef.current) return;
+            const ctx = audioContextRef.current;
+
+            if (gain1Ref.current) gain1Ref.current.gain.setValueAtTime(0, ctx.currentTime);
+            if (gain2Ref.current) gain2Ref.current.gain.setValueAtTime(0, ctx.currentTime);
+
+            const now = ctx.currentTime;
+
+            if (oscillatorRef.current) {
+                try { oscillatorRef.current.stop(); } catch(e) {}
+            }
+
+            const osc = ctx.createOscillator();
+            
+            if (type === 'piano') {
+                // 改良的鋼琴泛音結構：基頻 + 豐富的泛音列，模擬琴弦震動
+                const real = new Float32Array([0, 0.8, 0.3, 0.15, 0.1, 0.06, 0.03, 0.02, 0.01]); 
+                const imag = new Float32Array(real.length).fill(0);
+                const wave = ctx.createPeriodicWave(real, imag);
+                osc.setPeriodicWave(wave);
+            } else {
+                osc.type = type;
+            }
+
+            osc.frequency.setValueAtTime(frequency, now);
+            osc.connect(gainNodeRef.current);
+            osc.start();
+            oscillatorRef.current = osc;
+
+            gainNodeRef.current.gain.cancelScheduledValues(now);
+            gainNodeRef.current.gain.setValueAtTime(0, now); // 從 0 開始避免爆音
+
+            if (type === 'piano') {
+                // 改良的鋼琴 ADSR 包絡線
+                // Attack: 0.015s 快速敲擊感
+                // Decay: 快速衰減至 70%
+                // Sustain/Release: 模擬延音的自然衰減
+                gainNodeRef.current.gain.linearRampToValueAtTime(volume * 1.2, now + 0.015); 
+                gainNodeRef.current.gain.exponentialRampToValueAtTime(volume * 0.7, now + 0.2);
+                gainNodeRef.current.gain.exponentialRampToValueAtTime(volume * 0.01, now + 3.0);
+            } else {
+                gainNodeRef.current.gain.linearRampToValueAtTime(volume, now + 0.05);
+            }
+          }, [init]);
+
+          const playBeat = useCallback((freq1, freq2, volume = 0.3) => {
+            init();
+            if (!audioContextRef.current) return;
+            const ctx = audioContextRef.current;
+
+            if (gainNodeRef.current) gainNodeRef.current.gain.setValueAtTime(0, ctx.currentTime);
+
+            const now = ctx.currentTime;
+
+            if (!osc1Ref.current) {
+                osc1Ref.current = ctx.createOscillator();
+                osc1Ref.current.type = 'sine';
+                osc1Ref.current.connect(gain1Ref.current);
+                osc1Ref.current.start();
+            }
+            osc1Ref.current.frequency.setValueAtTime(freq1, now);
+            gain1Ref.current.gain.cancelScheduledValues(now);
+            gain1Ref.current.gain.linearRampToValueAtTime(volume, now + 0.05);
+
+            if (!osc2Ref.current) {
+                osc2Ref.current = ctx.createOscillator();
+                osc2Ref.current.type = 'sine';
+                osc2Ref.current.connect(gain2Ref.current);
+                osc2Ref.current.start();
+            }
+            osc2Ref.current.frequency.setValueAtTime(freq2, now);
+            gain2Ref.current.gain.cancelScheduledValues(now);
+            gain2Ref.current.gain.linearRampToValueAtTime(volume, now + 0.05);
+
+          }, [init]);
+
+          // 節拍器聲音播放 
+          // strength: 2 = 強拍 (Strong), 1 = 次強拍 (Medium), 0 = 弱拍 (Weak)
+          const playClick = useCallback((time, type, strength) => {
+            init();
+            if (!audioContextRef.current) return;
+            const ctx = audioContextRef.current;
+            
+            // 如果沒有指定時間，就立即播放
+            const t = time || ctx.currentTime;
+
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+            osc.connect(gain);
+            gain.connect(ctx.destination);
+
+            if (type === 'woodblock') {
+                let freq = 800; 
+                if (strength === 2) freq = 1000; 
+                if (strength === 1) freq = 900;  
+
+                osc.frequency.value = freq;
+                osc.type = 'sine';
+                
+                const volume = strength === 2 ? 1.0 : (strength === 1 ? 0.9 : 0.7);
+                gain.gain.setValueAtTime(volume, t);
+                gain.gain.exponentialRampToValueAtTime(0.01, t + 0.1);
+                
+                osc.start(t);
+                osc.stop(t + 0.1);
+            } else if (type === 'drum') {
+                if (strength === 2) {
+                    osc.frequency.setValueAtTime(150, t);
+                    osc.frequency.exponentialRampToValueAtTime(0.01, t + 0.5);
+                    gain.gain.setValueAtTime(1, t);
+                    gain.gain.exponentialRampToValueAtTime(0.01, t + 0.5);
+                } else if (strength === 1) {
+                    osc.type = 'triangle';
+                    osc.frequency.value = 1200; 
+                    gain.gain.setValueAtTime(0.5, t);
+                    gain.gain.exponentialRampToValueAtTime(0.01, t + 0.1);
+                } else {
+                    osc.type = 'triangle';
+                    osc.frequency.value = 1800; 
+                    gain.gain.setValueAtTime(0.2, t);
+                    gain.gain.exponentialRampToValueAtTime(0.01, t + 0.05);
+                }
+                osc.start(t);
+                osc.stop(t + 0.5);
+            } else {
+                let freq = 500; 
+                if (strength === 2) freq = 1000; 
+                if (strength === 1) freq = 750;  
+
+                osc.frequency.value = freq;
+                osc.type = 'square';
+                
+                const volume = strength === 2 ? 0.15 : (strength === 1 ? 0.12 : 0.08);
+                gain.gain.setValueAtTime(volume, t);
+                gain.gain.exponentialRampToValueAtTime(0.01, t + 0.1);
+                
+                osc.start(t);
+                osc.stop(t + 0.1);
+            }
+          }, [init]);
+
+          const stopTone = useCallback(() => {
+            if (audioContextRef.current && audioContextRef.current.state !== 'closed') {
+              const now = audioContextRef.current.currentTime;
+              [gainNodeRef.current, gain1Ref.current, gain2Ref.current].forEach(gain => {
+                if (gain) {
+                    gain.gain.cancelScheduledValues(now);
+                    gain.gain.setValueAtTime(gain.gain.value, now);
+                    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.1); 
+                }
+              });
+              
+              setTimeout(() => {
+                if (oscillatorRef.current) { try{ oscillatorRef.current.stop(); }catch(e){} oscillatorRef.current = null; }
+                if (osc1Ref.current) { try{ osc1Ref.current.stop(); }catch(e){} osc1Ref.current = null; }
+                if (osc2Ref.current) { try{ osc2Ref.current.stop(); }catch(e){} osc2Ref.current = null; }
+              }, 100);
+            }
+          }, []);
+
+          return useMemo(() => ({ playTone, playBeat, playClick, stopTone, init, context: audioContextRef.current }), [playTone, playBeat, playClick, stopTone, init]);
+        };
+
+        // --- 音高偵測演算法 ---
+        const autoCorrelate = (buf, sampleRate, threshold = 0.01) => {
+          let SIZE = buf.length;
+          let rms = 0;
+          for (let i = 0; i < SIZE; i++) {
+            let val = buf[i];
+            rms += val * val;
+          }
+          rms = Math.sqrt(rms / SIZE);
+          if (rms < threshold) return -1; 
+
+          let r1 = 0, r2 = SIZE - 1, thres = 0.2;
+          for (let i = 0; i < SIZE / 2; i++)
+            if (Math.abs(buf[i]) < thres) { r1 = i; break; }
+          for (let i = 1; i < SIZE / 2; i++)
+            if (Math.abs(buf[SIZE - i]) < thres) { r2 = SIZE - i; break; }
+
+          buf = buf.slice(r1, r2);
+          SIZE = buf.length;
+
+          let c = new Array(SIZE).fill(0);
+          for (let i = 0; i < SIZE; i++)
+            for (let j = 0; j < SIZE - i; j++)
+              c[i] = c[i] + buf[j] * buf[j + i];
+
+          let d = 0; while (c[d] > c[d + 1]) d++;
+          let maxval = -1, maxpos = -1;
+          for (let i = d; i < SIZE; i++) {
+            if (c[i] > maxval) {
+              maxval = c[i];
+              maxpos = i;
+            }
+          }
+          let T0 = maxpos;
+
+          let x1 = c[T0 - 1], x2 = c[T0], x3 = c[T0 + 1];
+          let a = (x1 + x3 - 2 * x2) / 2;
+          let b = (x3 - x1) / 2;
+          if (a) T0 = T0 - b / (2 * a);
+
+          return sampleRate / T0;
+        };
+
+        // ================= 組件定義區 =================
+
+        // 1. 小提琴模擬器
+        const ViolinSimulator = ({ audio }) => {
+          const baseFrequencies = [196.00, 293.66, 440.00, 659.25];
+          const stringNames = ['G', 'D', 'A', 'E'];
+          const [activeStringIndex, setActiveStringIndex] = useState(2); 
+          const [tensions, setTensions] = useState([1.0, 1.0, 1.0, 1.0]); 
+          const [fingerPosition, setFingerPosition] = useState(0); 
+          const [isPlaying, setIsPlaying] = useState(false);
+
+          const calculateFrequency = (stringIdx, pos, tensionMult) => {
+            const baseFreq = baseFrequencies[stringIdx];
+            const tensionFactor = tensionMult; 
+            const effectiveLength = 1 - (pos * 0.75); 
+            const lengthFactor = 1 / effectiveLength;
+            return baseFreq * tensionFactor * lengthFactor;
+          };
+
+          const handleFingerBoardMove = (e) => {
+            if (!isPlaying) return;
+            const rect = e.target.getBoundingClientRect();
+            const y = e.clientY - rect.top;
+            const height = rect.height;
+            let pos = y / height;
+            if (pos < 0) pos = 0;
+            if (pos > 0.95) pos = 0.95; 
+            setFingerPosition(pos);
+            const freq = calculateFrequency(activeStringIndex, pos, tensions[activeStringIndex]);
+            audio.playTone(freq, 'sawtooth', 0.4);
+          };
+
+          const startPlaying = (e) => {
+            e.preventDefault(); 
+            setIsPlaying(true);
+            const rect = e.currentTarget.getBoundingClientRect();
+            const y = (e.touches ? e.touches[0].clientY : e.clientY) - rect.top;
+            const height = rect.height;
+            let pos = y / height;
+            if (pos < 0) pos = 0;
+            if (pos > 0.95) pos = 0.95;
+            setFingerPosition(pos);
+            const freq = calculateFrequency(activeStringIndex, pos, tensions[activeStringIndex]);
+            audio.playTone(freq, 'sawtooth', 0.4);
+          };
+
+          const stopPlaying = () => {
+            setIsPlaying(false);
+            setFingerPosition(0);
+            audio.stopTone();
+          };
+
+          const adjustTension = (index, delta) => {
+            const newTensions = [...tensions];
+            let newVal = newTensions[index] + delta;
+            if (newVal < 0.5) newVal = 0.5;
+            if (newVal > 1.5) newVal = 1.5;
+            newTensions[index] = newVal;
+            setTensions(newTensions);
+          };
+
+          const resetTuning = () => {
+            setTensions([1.0, 1.0, 1.0, 1.0]);
+          };
+
+          const currentFreq = calculateFrequency(activeStringIndex, fingerPosition, tensions[activeStringIndex]);
+          const noteInfo = getNoteInfo(currentFreq);
+
+          return (
+            <div className="flex flex-col items-center w-full max-w-4xl animate-fade-in">
+              <div className="bg-amber-50 p-6 rounded-xl shadow-lg border-2 border-amber-200 w-full">
+                <h2 className="text-2xl font-bold text-amber-900 mb-4 flex items-center justify-between">
+                  <div className="flex items-center"><Music className="mr-2" /> 弦樂器實驗：小提琴</div>
+                  <button 
+                    onClick={resetTuning}
+                    className="text-sm bg-amber-200 hover:bg-amber-300 text-amber-800 px-3 py-1.5 rounded-lg flex items-center transition-colors shadow-sm"
+                  >
+                    <RefreshCw className="w-4 h-4 mr-1.5" />
+                    一鍵調音 (標準音高)
+                  </button>
+                </h2>
+                
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                  {/* 左側：控制面板 */}
+                  <div className="space-y-6">
+                    <div className="bg-white p-4 rounded-lg shadow-sm">
+                      <h3 className="font-bold text-gray-700 mb-2">1. 選擇琴弦 (粗細/質量)</h3>
+                      <p className="text-sm text-gray-500 mb-3">
+                        越粗的弦 (G) 質量越大，震動越慢，聲音越低。
+                      </p>
+                      <div className="flex justify-between gap-2">
+                        {stringNames.map((name, idx) => (
+                          <button
+                            key={name}
+                            onClick={() => setActiveStringIndex(idx)}
+                            className={`flex-1 py-3 rounded-lg font-bold transition-all border-b-4 ${
+                              activeStringIndex === idx
+                                ? 'bg-amber-600 text-white border-amber-800 translate-y-[2px] border-b-0'
+                                : 'bg-amber-100 text-amber-800 border-amber-300 hover:bg-amber-200'
+                            }`}
+                          >
+                            {name}弦
+                            <div className="w-full bg-gray-800 mt-2 mx-auto" style={{ height: `${4 - idx}px`, width: '80%' }} />
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="bg-white p-4 rounded-lg shadow-sm">
+                      <div className="flex justify-between items-center mb-2">
+                        <h3 className="font-bold text-gray-700">2. 調整鬆緊 (張力)</h3>
+                        <span className={`text-xs font-mono px-2 py-1 rounded ${tensions[activeStringIndex] === 1.0 ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'}`}>
+                           {tensions[activeStringIndex] === 1.0 ? '標準' : tensions[activeStringIndex] > 1 ? '偏緊' : '偏鬆'}
+                        </span>
+                      </div>
+                      <p className="text-sm text-gray-500 mb-3">
+                        調整弦軸：繃緊頻率變高，放鬆頻率變低。
+                      </p>
+                      
+                      <div className="flex items-center gap-4 bg-gray-50 p-3 rounded-lg border border-gray-100">
+                          <div className="font-mono font-bold text-xl text-amber-900 w-12 text-center">
+                            {stringNames[activeStringIndex]}弦
+                          </div>
+                          
+                          <div className="flex-1 flex items-center justify-center gap-3">
+                            <button onClick={() => adjustTension(activeStringIndex, -0.05)} className="p-3 bg-white border border-gray-300 rounded-full shadow-sm hover:bg-gray-50 active:scale-95 transition-all text-blue-600" title="轉鬆"><RotateCcw size={20} /></button>
+                            <div className="text-center w-24">
+                              <div className="text-xs text-gray-400 mb-1">張力倍率</div>
+                              <div className="text-xl font-mono font-bold text-gray-700">{tensions[activeStringIndex].toFixed(2)}x</div>
+                            </div>
+                            <button onClick={() => adjustTension(activeStringIndex, 0.05)} className="p-3 bg-white border border-gray-300 rounded-full shadow-sm hover:bg-gray-50 active:scale-95 transition-all text-red-600" title="轉緊"><RotateCw size={20} /></button>
+                          </div>
+                      </div>
+                      <div className="flex justify-between text-xs text-gray-400 mt-2 px-2"><span>← 轉鬆 (低)</span><span>轉緊 (高) →</span></div>
+                    </div>
+
+                    <div className="bg-blue-50 p-4 rounded-lg border border-blue-100">
+                      <h3 className="font-bold text-blue-800 mb-1">即時物理與音高</h3>
+                      <div className="grid grid-cols-2 gap-4 text-sm">
+                        <div><span className="text-gray-500">當前頻率:</span><div className="text-2xl font-mono text-blue-600 font-bold">{Math.round(currentFreq)} Hz</div></div>
+                        <div><span className="text-gray-500">有效弦長:</span><div className="text-xl font-mono text-blue-600">{isPlaying ? Math.round((1 - fingerPosition * 0.75) * 100) : 100}%</div></div>
+                        <div><span className="text-gray-500">音名 (Note):</span><div className="text-xl font-bold text-amber-700">{noteInfo.name}</div></div>
+                        <div><span className="text-gray-500">唱名 (Solfege):</span><div className="text-xl font-bold text-amber-700">{noteInfo.solfege}</div></div>
+                      </div>
+                      <div className="mt-2 text-xs text-gray-500">操作：在右側指板上<b>按住並滑動</b>滑鼠/手指來改變弦長與音高。</div>
+                    </div>
+                  </div>
+
+                  <div className="flex justify-center items-start select-none">
+                    <div className="relative" style={{ height: '550px', width: '220px' }}>
+                      {/* 小提琴 SVG 繪圖 */}
+                      <svg className="w-full h-full drop-shadow-2xl" viewBox="0 0 220 550">
+                        <defs>
+                          <radialGradient id="woodGradient" cx="50%" cy="50%" r="50%" fx="50%" fy="50%">
+                            <stop offset="0%" stopColor="#d98c2a" />
+                            <stop offset="70%" stopColor="#a0522d" />
+                            <stop offset="100%" stopColor="#633212" />
+                          </radialGradient>
+                          <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+                            <feGaussianBlur in="SourceAlpha" stdDeviation="3" />
+                            <feOffset dx="2" dy="2" result="offsetblur" />
+                            <feComponentTransfer><feFuncA type="linear" slope="0.5" /></feComponentTransfer>
+                            <feMerge><feMergeNode /><feMergeNode in="SourceGraphic" /></feMerge>
+                          </filter>
+                        </defs>
+                        <path d="M 90,5 L 130,5 L 125,70 L 95,70 Z" fill="#633212" />
+                        <circle cx="95" cy="40" r="6" fill="#1a1a1a" /> <circle cx="125" cy="40" r="6" fill="#1a1a1a" />
+                        <circle cx="95" cy="60" r="6" fill="#1a1a1a" /> <circle cx="125" cy="60" r="6" fill="#1a1a1a" />
+                        <rect x="98" y="70" width="24" height="130" fill="#3e2723" />
+                        <path d="M 110,150 C 60,150 40,240 75,270 C 60,285 60,310 75,325 C 20,360 40,500 110,510 C 180,500 200,360 145,325 C 160,310 160,285 145,270 C 180,240 160,150 110,150 Z" fill="url(#woodGradient)" stroke="#4a2c18" strokeWidth="2" filter="url(#shadow)" />
+                        <path d="M 75,360 Q 65,380 75,400" fill="none" stroke="#2a1a0f" strokeWidth="4" strokeLinecap="round" />
+                        <path d="M 145,360 Q 155,380 145,400" fill="none" stroke="#2a1a0f" strokeWidth="4" strokeLinecap="round" />
+                        <path d="M 98,70 L 122,70 L 125,350 L 95,350 Z" fill="#1a1a1a" />
+                        <rect x="98" y="70" width="24" height="5" fill="#000" />
+                        <path d="M 95,450 L 125,450 L 115,530 L 105,530 Z" fill="#1a1a1a" />
+                        <path d="M 50,480 C 50,450 100,450 110,480 C 120,520 80,530 50,480" fill="#1a1a1a" opacity="0.9" />
+                        <path d="M 85,380 L 135,380 L 130,390 L 90,390 Z" fill="#deb887" />
+                        {[0, 1, 2, 3].map(i => {
+                           const xPos = 101 + (i * 6);
+                           const width = (4-i) * 0.6 + 0.5;
+                           const color = i === activeStringIndex ? "#FFD700" : "#C0C0C0";
+                           const opacity = i === activeStringIndex ? 1 : 0.7;
+                           const isVibrating = isPlaying && i === activeStringIndex;
+                           return (
+                             <React.Fragment key={i}>
+                                <line x1={xPos} y1="70" x2={xPos} y2="460" stroke={color} strokeWidth={width} opacity={opacity}>
+                                   {isVibrating && (<animate attributeName="stroke-width" values={`${width};${width+2};${width}`} dur="0.05s" repeatCount="indefinite" />)}
+                                </line>
+                             </React.Fragment>
+                           )
+                        })}
+                      </svg>
+                      <div 
+                        className="absolute cursor-pointer z-10"
+                        style={{ top: '12%', left: '43%', width: '14%', height: '50%' }}
+                        onMouseDown={startPlaying} onMouseMove={handleFingerBoardMove} onMouseUp={stopPlaying} onMouseLeave={stopPlaying} onTouchStart={startPlaying} onTouchMove={handleFingerBoardMove} onTouchEnd={stopPlaying}
+                      >
+                         {isPlaying && (<div className="absolute w-full h-4 bg-red-500 rounded-full opacity-50 transform -translate-x-1/2 left-1/2 pointer-events-none shadow-glow" style={{ top: `${fingerPosition * 100}%`, transform: 'translate(-50%, -50%)' }} />)}
+                         {!isPlaying && (<div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 text-white text-xs opacity-50 pointer-events-none whitespace-nowrap rotate-90">按壓此處滑動</div>)}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          );
+        };
+
+        // 2. 直笛模擬器
+        const RecorderSimulator = ({ audio }) => {
+          const [recorderType, setRecorderType] = useState('soprano'); 
+          const [holes, setHoles] = useState([false, false, false, false, false, false, false]); 
+          const [isBlowing, setIsBlowing] = useState(false);
+
+          const toggleHole = (index) => {
+            const newHoles = [...holes];
+            newHoles[index] = !newHoles[index];
+            setHoles(newHoles);
+          };
+
+          const calculatePhysics = () => {
+            let firstOpenHoleIndex = -1;
+            for(let i = 0; i < 7; i++) {
+                if (!holes[i]) { firstOpenHoleIndex = i; break; }
+            }
+            
+            let effectiveLengthPercentage = 100;
+            if (firstOpenHoleIndex !== -1) {
+                const holePositions = [50, 53, 59, 67, 75, 79, 89]; 
+                effectiveLengthPercentage = holePositions[firstOpenHoleIndex];
+            }
+
+            const baseFreq = recorderType === 'soprano' ? 523.25 : 349.23; 
+            const frequency = baseFreq * (100 / effectiveLengthPercentage);
+            return { frequency, effectiveLengthPercentage };
+          };
+
+          const { frequency, effectiveLengthPercentage } = calculatePhysics();
+          const noteInfo = getNoteInfo(frequency);
+
+          useEffect(() => {
+              setHoles([false, false, false, false, false, false, false]);
+              setIsBlowing(false);
+              audio.stopTone();
+          }, [recorderType]);
+
+          useEffect(() => {
+            if (isBlowing) { audio.playTone(frequency, 'sine', 0.5); } else { audio.stopTone(); }
+          }, [isBlowing, frequency, audio]);
+
+          const visualLengthClass = recorderType === 'alto' ? 'h-[480px]' : 'h-[400px]';
+          const tubeColorClass = recorderType === 'alto' ? 'bg-[#f4e4bc]' : 'bg-[#fdfcf0]'; 
+
+          return (
+            <div className="flex flex-col items-center w-full max-w-4xl animate-fade-in">
+              <div className="bg-sky-50 p-6 rounded-xl shadow-lg border-2 border-sky-200 w-full">
+                <div className="flex justify-between items-center mb-4">
+                    <h2 className="text-2xl font-bold text-sky-900 flex items-center"><Wind className="mr-2" /> 管樂器實驗：直笛</h2>
+                    <div className="flex bg-sky-200 rounded-lg p-1">
+                        <button onClick={() => setRecorderType('soprano')} className={`px-4 py-1.5 rounded-md text-sm font-bold transition-all ${recorderType === 'soprano' ? 'bg-white text-sky-800 shadow-sm' : 'text-sky-600 hover:bg-sky-100'}`}>高音 (Soprano)</button>
+                        <button onClick={() => setRecorderType('alto')} className={`px-4 py-1.5 rounded-md text-sm font-bold transition-all ${recorderType === 'alto' ? 'bg-white text-sky-800 shadow-sm' : 'text-sky-600 hover:bg-sky-100'}`}>中音 (Alto)</button>
+                    </div>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                  <div className="space-y-6">
+                     <div className="bg-white p-4 rounded-lg shadow-sm">
+                       <h3 className="font-bold text-gray-700 mb-2">實驗說明</h3>
+                       <p className="text-sm text-gray-600 mb-2">目前選擇：<span className="font-bold text-sky-600">{recorderType === 'soprano' ? '高音直笛 (C調)' : '中音直笛 (F調)'}</span></p>
+                       <ul className="list-disc list-inside text-sm text-gray-600 space-y-1">
+                         <li><b>{recorderType === 'soprano' ? 'C5' : 'F4'}</b>：全按時的最低音。</li>
+                         <li><b>中音直笛</b>管身較長，因此音域較低。</li>
+                         <li>按住吹氣按鈕來發聲。</li>
+                         <li>點擊直笛上的<b>黑色孔洞</b>來打開或關閉它們。</li>
+                         <li><b>黑色 = 閉 (按住)</b>，白色 = 開 (放開)。</li>
+                         <li>空氣柱模型會隨管長與音高變化。</li>
+                       </ul>
+                     </div>
+                     <div className="bg-white p-4 rounded-lg shadow-sm flex flex-col items-center">
+                        <button
+                          className={`w-full py-4 rounded-xl font-bold text-xl shadow-md transition-all transform ${isBlowing ? 'bg-sky-600 text-white scale-95 ring-4 ring-sky-300' : 'bg-sky-100 text-sky-700 hover:bg-sky-200'}`}
+                          onMouseDown={() => setIsBlowing(true)} onMouseUp={() => setIsBlowing(false)} onMouseLeave={() => setIsBlowing(false)} onTouchStart={(e) => { e.preventDefault(); setIsBlowing(true); }} onTouchEnd={(e) => { e.preventDefault(); setIsBlowing(false); }}
+                        >
+                          {isBlowing ? '呼氣中...' : '按住吹氣'}
+                        </button>
+                        <p className="mt-2 text-xs text-gray-400">支援觸控與滑鼠長按</p>
+                     </div>
+                     <div className="bg-blue-100 p-4 rounded-lg border border-blue-200">
+                       <h3 className="font-bold text-blue-900 mb-2">物理與音高</h3>
+                       <div className="grid grid-cols-2 gap-4 text-sm">
+                          <div><div className="text-xs text-blue-600">有效空氣柱</div><div className="text-xl font-mono font-bold text-blue-800">{Math.round(effectiveLengthPercentage)}%</div></div>
+                          <div><div className="text-xs text-blue-600">頻率</div><div className="text-xl font-mono font-bold text-blue-800">{Math.round(frequency)} Hz</div></div>
+                          <div><div className="text-xs text-blue-600">音名 (Note)</div><div className="text-xl font-bold text-blue-800">{noteInfo.name}</div></div>
+                          <div><div className="text-xs text-blue-600">唱名 (Solfege)</div><div className="text-xl font-bold text-blue-800">{noteInfo.solfege}</div></div>
+                       </div>
+                     </div>
+                  </div>
+                  <div className={`flex justify-center items-end gap-16 bg-white p-8 rounded-xl border border-gray-100 transition-all duration-500`}>
+                    <div className="flex flex-col items-center gap-2">
+                        <div className="text-xs font-bold text-gray-500">直笛外觀</div>
+                        <div className={`relative w-16 ${visualLengthClass} transition-all duration-500`}>
+                           <div className="w-full h-full relative">
+                                <div className={`absolute top-0 left-1/2 transform -translate-x-1/2 w-11 h-16 ${tubeColorClass} rounded-t-xl z-20 shadow-[inset_-2px_0_4px_rgba(0,0,0,0.1)] border-x border-t border-[#e8e4c9]`}></div>
+                                <div className="absolute top-10 left-1/2 transform -translate-x-1/2 w-8 h-5 bg-[#d4d0b0] z-20 shadow-inner"><div className="w-full h-1/2 bg-[#3a3528] opacity-80"></div></div>
+                                <div className={`absolute top-16 left-1/2 transform -translate-x-1/2 w-9 ${recorderType === 'alto' ? 'h-[400px]' : 'h-[320px]'} ${tubeColorClass} z-10 shadow-[inset_-3px_0_5px_rgba(0,0,0,0.05)] border-x border-[#e8e4c9] transition-all duration-500`}></div>
+                                <div className="absolute top-15 left-1/2 transform -translate-x-1/2 w-11 h-1 bg-[#e8e4c9] z-30"></div>
+                                <div className={`absolute ${recorderType === 'alto' ? 'top-[360px]' : 'top-[280px]'} left-1/2 transform -translate-x-1/2 w-10 h-2 bg-[#e8e4c9] z-30 rounded-sm transition-all duration-500`}></div>
+                                <div className={`absolute bottom-0 left-1/2 transform -translate-x-1/2 w-11 h-12 ${tubeColorClass} rounded-b-xl z-10 shadow-[inset_-2px_-2px_4px_rgba(0,0,0,0.1)] border border-[#e8e4c9]`}></div>
+                                <div className="absolute bottom-10 left-1/2 transform -translate-x-1/2 w-11 h-1 bg-[#e8e4c9] z-30"></div>
+                           </div>
+                           <div className={`absolute top-12 left-0 w-full ${recorderType === 'alto' ? 'h-[430px]' : 'h-[350px]'} z-40 transition-all duration-500`}>
+                             {holes.map((isClosed, index) => {
+                               const topPos = 15 + (index * 11.5); 
+                               const isDoubleHole = index >= 5;
+                               if (isDoubleHole) {
+                                   return (
+                                       <button key={index} onClick={() => toggleHole(index)} className="absolute left-1/2 transform -translate-x-1/2 flex items-center justify-center gap-[2px] cursor-pointer hover:opacity-80 transition-opacity" style={{ top: `${topPos}%`, width: '32px', height: '20px' }} title="雙孔 (點擊開/關)">
+                                           <div className={`w-2 h-2 rounded-full border border-gray-400 ${isClosed ? 'bg-gray-800 shadow-inner' : 'bg-[#4a4036] bg-opacity-10 shadow-sm'}`} />
+                                           <div className={`w-3.5 h-3.5 rounded-full border border-gray-400 ${isClosed ? 'bg-gray-800 shadow-inner' : 'bg-[#4a4036] bg-opacity-10 shadow-sm'}`} />
+                                       </button>
+                                   )
+                               }
+                               return (<button key={index} onClick={() => toggleHole(index)} className={`absolute left-1/2 transform -translate-x-1/2 w-4 h-4 rounded-full border border-gray-400 transition-colors duration-200 ${isClosed ? 'bg-gray-800 shadow-inner' : 'bg-[#4a4036] bg-opacity-10 shadow-sm'}`} style={{ top: `${topPos}%` }} />);
+                             })}
+                           </div>
+                           {isBlowing && (<div className="absolute -top-4 left-1/2 transform -translate-x-1/2 w-full flex justify-center z-50"><Wind className="text-sky-400 animate-pulse" size={24} /></div>)}
+                        </div>
+                    </div>
+                    <div className="flex flex-col items-center gap-2">
+                        <div className="text-xs font-bold text-gray-500">空氣柱模型</div>
+                        <div className={`w-16 ${visualLengthClass} border-2 border-dashed border-gray-300 rounded-lg relative bg-gray-50 overflow-hidden transition-all duration-500`}>
+                             <div className="absolute top-0 left-0 w-full bg-blue-400 opacity-60 rounded-t-lg transition-all duration-300 ease-out border-b-4 border-blue-600" style={{ height: `${effectiveLengthPercentage}%` }}>
+                                <div className="w-full h-full opacity-30 bg-[url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxMCIgaGVpZ2h0PSIxMCI+PHBhdGggZD0iTTAgMTAgTDUgMCBMMTAgMTAiIGZpbGw9Im5vbmUiIHN0cm9rZT0id2hpdGUiIHN0cm9rZS13aWR0aD0iMSIvPjwvc3ZnPg==')]"></div>
+                             </div>
+                             <div className="absolute right-0 top-0 h-full border-l border-gray-300 flex flex-col justify-between text-[10px] text-gray-400 px-1 py-2"><span>Head</span><span>End</span></div>
+                        </div>
+                        <div className="text-xs text-blue-600 font-bold">L: {Math.round(effectiveLengthPercentage)}%</div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          );
+        };
+
+        // 3. 拍音實驗室
+        const BeatSimulator = ({ audio }) => {
+            const [freq1, setFreq1] = useState(440);
+            const [freq2, setFreq2] = useState(444);
+            const [isPlaying, setIsPlaying] = useState(false);
+            const canvasRef = useRef(null);
+            const animationRef = useRef(null);
+            const beatFreq = Math.abs(freq1 - freq2);
+
+            const togglePlay = () => {
+                if (isPlaying) { audio.stopTone(); } else { audio.playBeat(freq1, freq2); }
+                setIsPlaying(!isPlaying);
+            };
+
+            useEffect(() => {
+                if (isPlaying) { audio.playBeat(freq1, freq2); }
+            }, [freq1, freq2, isPlaying, audio]);
+
+            useEffect(() => {
+                const canvas = canvasRef.current;
+                const ctx = canvas.getContext('2d');
+                let time = 0;
+                const draw = () => {
+                    const width = canvas.width;
+                    const height = canvas.height;
+                    const centerY = height / 2;
+                    ctx.clearRect(0, 0, width, height);
+                    ctx.strokeStyle = '#f0f0f0'; ctx.lineWidth = 1; ctx.beginPath();
+                    for(let i=0; i<width; i+=40) { ctx.moveTo(i,0); ctx.lineTo(i,height); }
+                    for(let i=0; i<height; i+=40) { ctx.moveTo(0,i); ctx.lineTo(width,i); }
+                    ctx.stroke();
+
+                    const visualBaseFreq = 0.05; 
+                    const vF1 = visualBaseFreq; 
+                    const vF2 = visualBaseFreq * (freq2 / freq1);
+                    const amp = 40; 
+                    
+                    // Wave 1
+                    ctx.beginPath(); ctx.strokeStyle = 'rgba(239, 68, 68, 0.4)'; ctx.lineWidth = 2;
+                    for (let x = 0; x < width; x++) {
+                        const y = centerY - 60 + Math.sin((x + time) * vF1 * 2) * amp;
+                        if (x === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+                    }
+                    ctx.stroke();
+                    // Wave 2
+                    ctx.beginPath(); ctx.strokeStyle = 'rgba(59, 130, 246, 0.4)'; ctx.lineWidth = 2;
+                    for (let x = 0; x < width; x++) {
+                        const y = centerY - 60 + Math.sin((x + time) * vF2 * 2) * amp;
+                        if (x === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+                    }
+                    ctx.stroke();
+                    // Combined
+                    ctx.beginPath(); ctx.strokeStyle = '#8b5cf6'; ctx.lineWidth = 3;
+                    for (let x = 0; x < width; x++) {
+                        const w1 = Math.sin((x + time) * vF1 * 2);
+                        const w2 = Math.sin((x + time) * vF2 * 2);
+                        const y = centerY + 60 + (w1 + w2) * amp; 
+                        if (x === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+                    }
+                    ctx.stroke();
+
+                    ctx.fillStyle = '#ef4444'; ctx.font = '12px sans-serif'; ctx.fillText('波源 A', 10, centerY - 80);
+                    ctx.fillStyle = '#3b82f6'; ctx.fillText('波源 B', 10, centerY - 100);
+                    ctx.fillStyle = '#7c3aed'; ctx.font = 'bold 14px sans-serif'; ctx.fillText('疊加結果 (拍音)', 10, centerY + 40);
+
+                    time += 2; 
+                    animationRef.current = requestAnimationFrame(draw);
+                };
+                const resizeCanvas = () => {
+                     const parent = canvas.parentElement;
+                     if (parent) { canvas.width = parent.clientWidth; canvas.height = 300; }
+                };
+                window.addEventListener('resize', resizeCanvas);
+                resizeCanvas();
+                draw();
+                return () => { window.removeEventListener('resize', resizeCanvas); cancelAnimationFrame(animationRef.current); };
+            }, [freq1, freq2]);
+
+            return (
+                <div className="flex flex-col items-center w-full max-w-4xl animate-fade-in">
+                     <div className="bg-purple-50 p-6 rounded-xl shadow-lg border-2 border-purple-200 w-full">
+                        <h2 className="text-2xl font-bold text-purple-900 mb-4 flex items-center justify-between">
+                            <div className="flex items-center"><Activity className="mr-2" /> 拍音實驗室 (Beats)</div>
+                            <button onClick={togglePlay} className={`px-6 py-2 rounded-full font-bold shadow-md transition-all flex items-center ${isPlaying ? 'bg-red-500 text-white hover:bg-red-600' : 'bg-green-500 text-white hover:bg-green-600'}`}>{isPlaying ? '停止聲音' : '播放拍音'}</button>
+                        </h2>
+                        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                            <div className="lg:col-span-1 space-y-6">
+                                <div className="bg-white p-4 rounded-lg shadow-sm border-l-4 border-red-400">
+                                    <h3 className="font-bold text-gray-700 mb-2 flex justify-between">波源 A 頻率<span className="text-red-500 font-mono text-xl">{freq1} Hz</span></h3>
+                                    <input type="range" min="200" max="600" step="1" value={freq1} onChange={(e) => setFreq1(Number(e.target.value))} className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-red-500 mb-3" />
+                                    <div className="flex justify-center gap-2"><button onClick={() => setFreq1(f => f-1)} className="px-3 py-1 bg-gray-100 rounded hover:bg-gray-200">-1</button><button onClick={() => setFreq1(f => f+1)} className="px-3 py-1 bg-gray-100 rounded hover:bg-gray-200">+1</button></div>
+                                </div>
+                                <div className="bg-white p-4 rounded-lg shadow-sm border-l-4 border-blue-400">
+                                    <h3 className="font-bold text-gray-700 mb-2 flex justify-between">波源 B 頻率<span className="text-blue-500 font-mono text-xl">{freq2} Hz</span></h3>
+                                    <input type="range" min="200" max="600" step="1" value={freq2} onChange={(e) => setFreq2(Number(e.target.value))} className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-blue-500 mb-3" />
+                                    <div className="flex justify-center gap-2"><button onClick={() => setFreq2(f => f-1)} className="px-3 py-1 bg-gray-100 rounded hover:bg-gray-200">-1</button><button onClick={() => setFreq2(f => f+1)} className="px-3 py-1 bg-gray-100 rounded hover:bg-gray-200">+1</button></div>
+                                </div>
+                                <div className="bg-purple-100 p-4 rounded-lg border border-purple-300 text-center">
+                                    <div className="text-sm text-purple-700 font-bold mb-1">拍頻 (Beat Frequency)</div>
+                                    <div className="text-4xl font-extrabold text-purple-900 font-mono my-2">{beatFreq} <span className="text-lg">Hz</span></div>
+                                    <div className="text-xs text-purple-600">每秒會聽到 {beatFreq} 次聲音強弱變化</div>
+                                </div>
+                            </div>
+                            <div className="lg:col-span-2 space-y-4">
+                                <div className="bg-white p-2 rounded-lg shadow-inner border border-gray-200 w-full"><canvas ref={canvasRef} className="w-full bg-white rounded cursor-crosshair" /></div>
+                                <div className="bg-white p-5 rounded-lg shadow-sm">
+                                    <h3 className="font-bold text-gray-800 mb-2 flex items-center"><Info size={18} className="mr-2 text-purple-600" />實驗原理與操作說明</h3>
+                                    <div className="text-sm text-gray-600 space-y-2">
+                                        <p><b>什麼是拍音？</b> 當兩個頻率些微不同的聲波重疊時，波峰與波峰相遇會產生<b>「建設性干涉」</b>（聲音變大），波峰與波谷相遇會產生<b>「破壞性干涉」</b>（聲音變小）。這種聲音忽大忽小的週期性變化稱為拍音。</p>
+                                        <div>
+                                            <b>操作方式：</b>
+                                            <ul className="list-disc list-inside ml-2 mt-1">
+                                                <li>點擊上方的<b>「播放拍音」</b>按鈕。</li>
+                                                <li>調整兩個波源的頻率滑桿，使它們的頻率<b>非常接近</b>（例如相差 1~5 Hz）。</li>
+                                                <li>聆聽聲音的「嗡-嗡-嗡」變化，並觀察右圖紫色波形的<b>包絡線</b>形狀。</li>
+                                                <li>拍頻公式：<code className="bg-gray-100 px-1 rounded">f_beat = |f1 - f2|</code>。</li>
+                                            </ul>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                     </div>
+                </div>
+            );
+        };
+
+        // 4. 調音大師
+        const TunerMaster = ({ audio }) => {
+          const [isTunerActive, setIsTunerActive] = useState(false);
+          const [detectedPitch, setDetectedPitch] = useState(null);
+          const [activePianoKey, setActivePianoKey] = useState(null); 
+          const [noiseThreshold, setNoiseThreshold] = useState(0.02); // 預設值 0.02
+          const noiseThresholdRef = useRef(noiseThreshold); 
+
+          const audioContextRef = useRef(null);
+          const analyserRef = useRef(null);
+          const sourceRef = useRef(null);
+          const rafIdRef = useRef(null);
+
+          useEffect(() => {
+              noiseThresholdRef.current = noiseThreshold;
+          }, [noiseThreshold]);
+
+          const pianoKeys = useMemo(() => {
+            const keys = [];
+            const startOctave = 3; const endOctave = 5;
+            const notes = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+            for (let o = startOctave; o <= endOctave; o++) {
+              for (let i = 0; i < notes.length; i++) {
+                if (o === endOctave && i > 0) break;
+                const note = notes[i];
+                const isBlack = note.includes('#');
+                const midi = (o + 1) * 12 + i;
+                const frequency = 440 * Math.pow(2, (midi - 69) / 12);
+                keys.push({ note: `${note}${o}`, midi, frequency, isBlack, label: note });
+              }
+            }
+            return keys;
+          }, []);
+
+          useEffect(() => {
+            let isMounted = true; 
+            if (isTunerActive) {
+              const startMic = async () => {
+                try {
+                  const stream = await navigator.mediaDevices.getUserMedia({ 
+                      audio: { 
+                          echoCancellation: true, 
+                          noiseSuppression: true, 
+                          autoGainControl: false 
+                      } 
+                  });
+                  if (!isMounted) return;
+                  
+                  const AudioContext = window.AudioContext || window.webkitAudioContext;
+                  const ctx = new AudioContext();
+                  audioContextRef.current = ctx;
+                  analyserRef.current = ctx.createAnalyser();
+                  analyserRef.current.fftSize = 2048;
+                  sourceRef.current = ctx.createMediaStreamSource(stream);
+                  sourceRef.current.connect(analyserRef.current);
+                  
+                  const updatePitch = () => {
+                    if (!isMounted || !analyserRef.current) return;
+                    const buffer = new Float32Array(analyserRef.current.fftSize);
+                    analyserRef.current.getFloatTimeDomainData(buffer);
+                    // 傳入目前的降噪閾值
+                    const freq = autoCorrelate(buffer, ctx.sampleRate, noiseThresholdRef.current);
+                    if (freq !== -1 && freq > 80 && freq < 1500) { setDetectedPitch(freq); }
+                    rafIdRef.current = requestAnimationFrame(updatePitch);
+                  };
+                  updatePitch();
+                } catch (err) {
+                  console.error("Mic Error:", err);
+                  if (isMounted) { alert("無法存取麥克風，調音功能無法使用。"); setIsTunerActive(false); }
+                }
+              };
+              startMic();
+            } else {
+              if (rafIdRef.current) cancelAnimationFrame(rafIdRef.current);
+              if (sourceRef.current) { try { sourceRef.current.disconnect(); } catch(e) { console.warn(e) } }
+              if (audioContextRef.current && audioContextRef.current.state !== 'closed') { audioContextRef.current.close().catch(e => console.warn(e)); }
+              setDetectedPitch(null);
+            }
+            return () => {
+              isMounted = false;
+              if (rafIdRef.current) cancelAnimationFrame(rafIdRef.current);
+              if (sourceRef.current) { try { sourceRef.current.disconnect(); } catch(e) { console.warn(e) } }
+              if (audioContextRef.current && audioContextRef.current.state !== 'closed') { audioContextRef.current.close().catch(e => console.warn(e)); }
+            };
+          }, [isTunerActive]);
+
+          const handlePianoPress = (key) => {
+            if (isTunerActive) setIsTunerActive(false); // 互斥
+            setActivePianoKey(key); 
+            audio.playTone(key.frequency, 'piano', 0.6); 
+          };
+          
+          const handlePianoRelease = () => { setActivePianoKey(null); audio.stopTone(); };
+
+          const toggleTuner = () => {
+              if (!isTunerActive) {
+                  audio.stopTone(); // 互斥
+                  setActivePianoKey(null);
+              }
+              setIsTunerActive(!isTunerActive);
+          };
+
+          const displayFreq = activePianoKey ? activePianoKey.frequency : detectedPitch;
+          const noteInfo = getNoteInfo(displayFreq);
+          const needleAngle = noteInfo.cents ? Math.max(-45, Math.min(45, noteInfo.cents * 0.9)) : 0;
+          
+          let statusColor = "text-gray-400"; let statusText = "等待訊號..."; let barColor = "bg-gray-300";
+          if (displayFreq) {
+            if (Math.abs(noteInfo.cents) < 10) { statusColor = "text-green-500"; statusText = "準確 (In Tune)"; barColor = "bg-green-500"; } 
+            else if (noteInfo.cents > 0) { statusColor = "text-red-500"; statusText = "太高 (Sharp #)"; barColor = "bg-red-500"; } 
+            else { statusColor = "text-blue-500"; statusText = "太低 (Flat b)"; barColor = "bg-blue-500"; }
+          }
+
+          return (
+            <div className="flex flex-col items-center w-full max-w-4xl animate-fade-in space-y-8">
+              <div className="bg-white p-6 rounded-xl shadow-lg border-2 border-gray-200 w-full relative">
+                 <h2 className="text-xl font-bold text-gray-800 mb-4 flex items-center"><Piano className="mr-2" /> 虛擬鋼琴與音高示範</h2>
+                 <div className="relative h-40 w-full overflow-x-auto overflow-y-hidden select-none flex justify-center">
+                    <div className="flex">
+                        {pianoKeys.filter(k => !k.isBlack).map(key => (
+                            <div key={key.note} className={`border border-gray-400 rounded-b-md cursor-pointer flex flex-col justify-end items-center pb-2 relative transition-colors ${activePianoKey?.note === key.note ? 'bg-yellow-200' : 'bg-white hover:bg-gray-100'}`} style={{ width: '40px', height: '100%', zIndex: 1 }} onMouseDown={() => handlePianoPress(key)} onMouseUp={handlePianoRelease} onMouseLeave={handlePianoRelease} onTouchStart={(e) => { e.preventDefault(); handlePianoPress(key); }} onTouchEnd={(e) => { e.preventDefault(); handlePianoRelease(); }}>
+                                <span className="text-xs font-bold text-gray-500">{key.note}</span>
+                            </div>
+                        ))}
+                    </div>
+                    <div className="absolute top-0 left-0 flex w-full justify-center pointer-events-none">
+                         <div className="flex">
+                            {pianoKeys.map((key, idx) => {
+                                if (!key.isBlack) { return <div key={idx} style={{width:'40px', height:'0'}}></div>; } 
+                                else {
+                                     return (
+                                         <div key={key.note} className={`w-6 h-24 rounded-b-md cursor-pointer pointer-events-auto z-10 -ml-3 mr-[-12px] transition-colors ${activePianoKey?.note === key.note ? 'bg-yellow-600' : 'bg-black hover:bg-gray-800'}`} onMouseDown={() => handlePianoPress(key)} onMouseUp={handlePianoRelease} onMouseLeave={handlePianoRelease} onTouchStart={(e) => { e.preventDefault(); handlePianoPress(key); }} onTouchEnd={(e) => { e.preventDefault(); handlePianoRelease(); }}></div>
+                                     );
+                                }
+                            })}
+                         </div>
+                    </div>
+                 </div>
+                 <p className="text-center text-xs text-gray-400 mt-2">點擊琴鍵播放聲音，並觀察下方儀表板</p>
+              </div>
+              <div className="bg-gray-900 p-8 rounded-2xl shadow-2xl border-4 border-gray-700 w-full max-w-2xl relative overflow-hidden">
+                  <div className="absolute top-4 right-4 flex gap-2">
+                      {isTunerActive && (
+                          <div className="flex items-center bg-gray-800 rounded-full px-3 py-1 mr-2 border border-gray-600">
+                              <Sliders size={14} className="text-gray-400 mr-2" />
+                              <span className="text-xs text-gray-400 mr-2 whitespace-nowrap">降噪</span>
+                              <input type="range" min="0.001" max="0.2" step="0.001" value={noiseThreshold} onChange={(e) => setNoiseThreshold(parseFloat(e.target.value))} className="w-16 h-1 bg-gray-600 rounded-lg appearance-none cursor-pointer accent-blue-500" title={`閾值: ${noiseThreshold.toFixed(3)}`} />
+                          </div>
+                      )}
+                      <button onClick={toggleTuner} className={`p-2 rounded-full transition-all ${isTunerActive ? 'bg-red-500 text-white animate-pulse' : 'bg-gray-700 text-gray-400 hover:bg-gray-600'}`} title={isTunerActive ? "關閉調音器" : "開啟麥克風調音"}>{isTunerActive ? <MicOff size={20} /> : <Mic size={20} />}</button>
+                  </div>
+                  <div className="flex flex-col items-center justify-center space-y-6">
+                      <div className="text-center">
+                          <div className="text-gray-400 text-sm font-mono tracking-widest mb-1">PITCH DETECTED</div>
+                          <div className={`text-6xl font-black tracking-tighter ${displayFreq ? 'text-white' : 'text-gray-700'}`}>{displayFreq ? noteInfo.name : '--'}</div>
+                          <div className={`text-2xl font-bold mt-2 ${displayFreq ? 'text-yellow-400' : 'text-gray-700'}`}>{displayFreq ? noteInfo.solfege : '--'}</div>
+                      </div>
+                      <div className="relative w-64 h-32 mt-4">
+                          <div className="absolute bottom-0 left-0 w-full h-full bg-gray-800 rounded-t-full border-t-4 border-l-4 border-r-4 border-gray-600 overflow-hidden"><div className="absolute bottom-0 left-1/2 transform -translate-x-1/2 w-4 h-16 bg-green-500 opacity-20 z-0"></div></div>
+                          <div className="absolute bottom-0 left-1/2 w-full text-center text-xs text-gray-500 transform -translate-x-1/2" style={{bottom: '-20px'}}><span className="mr-24">-50</span><span className="font-bold text-green-600">0</span><span className="ml-24">+50</span></div>
+                          <div className="absolute bottom-0 left-1/2 w-1 h-28 bg-red-500 origin-bottom transition-transform duration-200 ease-out z-10 rounded-full" style={{ transform: `translateX(-50%) rotate(${needleAngle}deg)` }}></div>
+                          <div className="absolute bottom-[-5px] left-1/2 w-4 h-4 bg-gray-400 rounded-full transform -translate-x-1/2 z-20"></div>
+                      </div>
+                      <div className="w-full space-y-2">
+                           <div className="flex justify-between items-end text-gray-400 font-mono text-sm border-b border-gray-700 pb-2"><span>Frequency</span><span className="text-xl text-white">{displayFreq ? Math.round(displayFreq * 10) / 10 : '0.0'} <span className="text-xs text-gray-500">Hz</span></span></div>
+                           <div className="flex justify-between items-center pt-2"><span className={`text-sm font-bold ${statusColor}`}>{statusText}</span><span className="text-xs text-gray-500 font-mono">{displayFreq ? (noteInfo.cents > 0 ? '+' : '') + Math.round(noteInfo.cents) + ' cents' : ''}</span></div>
+                           <div className="w-full h-2 bg-gray-800 rounded-full relative overflow-hidden">
+                               <div className="absolute left-1/2 top-0 h-full w-[1px] bg-white z-10"></div>
+                               {displayFreq && (<div className={`h-full absolute top-0 transition-all duration-200 ${barColor}`} style={{ left: '50%', width: `${Math.min(50, Math.abs(noteInfo.cents))}%`, transform: noteInfo.cents < 0 ? 'translateX(-100%)' : 'translateX(0)' }}></div>)}
+                           </div>
+                      </div>
+                  </div>
+              </div>
+            </div>
+          );
+        };
+
+        // 5. 音準教練
+        const PitchTrainer = ({ audio }) => {
+            const [mode, setMode] = useState('menu');
+            const [targetNote, setTargetNote] = useState(null);
+            const [detectedPitch, setDetectedPitch] = useState(null);
+            const [isMicActive, setIsMicActive] = useState(false);
+            const [noiseThreshold, setNoiseThreshold] = useState(0.02);
+            const noiseThresholdRef = useRef(noiseThreshold);
+
+            const [questionCount, setQuestionCount] = useState(1);
+            const [totalScore, setTotalScore] = useState(0);
+            const [roundScore, setRoundScore] = useState(null);
+            const [scoreHistory, setScoreHistory] = useState([]);
+
+            const audioContextRef = useRef(null);
+            const analyserRef = useRef(null);
+            const sourceRef = useRef(null);
+            const rafIdRef = useRef(null);
+
+            useEffect(() => {
+                noiseThresholdRef.current = noiseThreshold;
+            }, [noiseThreshold]);
+
+            const startMic = async () => {
+                try {
+                    const stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: false } });
+                    const AudioContext = window.AudioContext || window.webkitAudioContext;
+                    const ctx = new AudioContext();
+                    audioContextRef.current = ctx;
+                    analyserRef.current = ctx.createAnalyser();
+                    analyserRef.current.fftSize = 2048;
+                    sourceRef.current = ctx.createMediaStreamSource(stream);
+                    sourceRef.current.connect(analyserRef.current);
+
+                    const updatePitch = () => {
+                        if (!analyserRef.current) return;
+                        const buffer = new Float32Array(analyserRef.current.fftSize);
+                        analyserRef.current.getFloatTimeDomainData(buffer);
+                        const freq = autoCorrelate(buffer, ctx.sampleRate, noiseThresholdRef.current);
+                        if (freq !== -1 && freq > 80 && freq < 1500) { setDetectedPitch(freq); }
+                        rafIdRef.current = requestAnimationFrame(updatePitch);
+                    };
+                    updatePitch();
+                    setIsMicActive(true);
+                } catch (err) {
+                    console.error("Mic Error", err);
+                    alert("無法開啟麥克風");
+                    setIsMicActive(false);
+                }
+            };
+
+            const stopMic = () => {
+                if (rafIdRef.current) cancelAnimationFrame(rafIdRef.current);
+                if (sourceRef.current) { try{ sourceRef.current.disconnect(); }catch(e){} }
+                if (audioContextRef.current && audioContextRef.current.state !== 'closed') { audioContextRef.current.close().catch(e => {}); }
+                setIsMicActive(false);
+                setDetectedPitch(null);
+            };
+
+            useEffect(() => { return () => stopMic(); }, []);
+
+            const nextQuestion = () => {
+                setTargetNote(generateRandomNote());
+                setRoundScore(null);
+                setDetectedPitch(null); 
+            };
+
+            const startTraining = () => { setMode('training'); nextQuestion(); };
+            const startScoring = () => { setMode('scoring'); setQuestionCount(1); setTotalScore(0); setScoreHistory([]); nextQuestion(); };
+
+            const playTargetSound = () => {
+                if (isMicActive) stopMic(); // 互斥
+                audio.playTone(targetNote?.targetFreq, 'piano', 0.6);
+            };
+
+            const toggleMic = () => {
+                if (isMicActive) { stopMic(); } 
+                else { audio.stopTone(); startMic(); } // 互斥
+            };
+
+            const submitAnswer = () => {
+                if (!detectedPitch || !targetNote) return;
+                const userMidiExact = 12 * Math.log2(detectedPitch / 440) + 69;
+                const diffCents = Math.abs(userMidiExact - targetNote.targetMidi) * 100;
+                let score = 0;
+                if (diffCents <= 15) score = 20;
+                else if (diffCents <= 30) score = 15;
+                else if (diffCents <= 50) score = 10;
+                else if (diffCents <= 100) score = 5;
+                else score = 0;
+                setRoundScore(score);
+                setTotalScore(s => s + score);
+                setScoreHistory([...scoreHistory, { q: questionCount, score, target: targetNote.name, diff: Math.round(diffCents) }]);
+                stopMic(); 
+            };
+
+            const nextScoringLevel = () => {
+                if (questionCount >= 5) { setMode('result'); } 
+                else { setQuestionCount(q => q + 1); nextQuestion(); }
+            };
+
+            if (mode === 'menu') {
+                return (
+                    <div className="flex flex-col items-center justify-center h-full w-full max-w-4xl bg-white p-8 rounded-xl shadow-lg border border-gray-200">
+                        <h2 className="text-3xl font-bold text-gray-800 mb-6 flex items-center"><GraduationCap className="mr-3 text-amber-600" size={36} />音準教練</h2>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 w-full max-w-2xl">
+                            <button onClick={startTraining} className="flex flex-col items-center p-8 bg-green-50 border-2 border-green-200 rounded-2xl hover:bg-green-100 transition-all group"><Music size={48} className="text-green-600 mb-4 group-hover:scale-110 transition-transform" /><span className="text-xl font-bold text-green-800">自由訓練模式</span><span className="text-sm text-gray-600 mt-2 text-center">隨機出題，即時回饋，反覆練習直到準確。</span></button>
+                            <button onClick={startScoring} className="flex flex-col items-center p-8 bg-red-50 border-2 border-red-200 rounded-2xl hover:bg-red-100 transition-all group"><Trophy size={48} className="text-red-600 mb-4 group-hover:scale-110 transition-transform" /><span className="text-xl font-bold text-red-800">測驗評分模式</span><span className="text-sm text-gray-600 mt-2 text-center">挑戰 5 題，依照音準精確度給分，滿分 100 分。</span></button>
+                        </div>
+                    </div>
+                );
+            }
+
+            if (mode === 'result') {
+                return (
+                    <div className="flex flex-col items-center justify-center h-full w-full max-w-2xl bg-white p-8 rounded-xl shadow-lg animate-fade-in">
+                        <Trophy size={64} className="text-yellow-500 mb-4" /><h2 className="text-3xl font-bold text-gray-800 mb-2">測驗完成！</h2><div className="text-6xl font-black text-amber-600 mb-6">{totalScore} <span className="text-2xl text-gray-400">/ 100</span></div>
+                        <div className="w-full bg-gray-50 rounded-lg p-4 mb-6"><h3 className="font-bold text-gray-700 mb-2">詳細成績</h3><div className="space-y-2">{scoreHistory.map((item, idx) => (<div key={idx} className="flex justify-between items-center border-b border-gray-200 pb-1 last:border-0"><span className="text-gray-600">第 {item.q} 題 ({item.target})</span><div className="flex items-center"><span className="text-xs text-gray-400 mr-2">誤差 {item.diff} cents</span><span className={`font-bold ${item.score >= 15 ? 'text-green-600' : item.score > 0 ? 'text-amber-600' : 'text-red-600'}`}>+{item.score}</span></div></div>))}</div></div>
+                        <button onClick={() => setMode('menu')} className="px-8 py-3 bg-gray-800 text-white rounded-lg font-bold hover:bg-gray-700 transition-colors">返回主選單</button>
+                    </div>
+                );
+            }
+
+            let feedbackColor = "text-gray-400"; let feedbackText = "請發聲..."; let detectedInfo = { name: '--', cents: 0 }; let diffCents = 0;
+            if (detectedPitch && targetNote) {
+                diffCents = 1200 * Math.log2(detectedPitch / targetNote.targetFreq);
+                detectedInfo = getNoteInfo(detectedPitch);
+                if (Math.abs(diffCents) <= 15) { feedbackColor = "text-green-600"; feedbackText = "準確 (Perfect)!"; } 
+                else if (diffCents > 15) { feedbackColor = "text-red-500"; feedbackText = "太高了 (Too High)"; } 
+                else { feedbackColor = "text-blue-500"; feedbackText = "太低了 (Too Low)"; }
+            }
+
+            return (
+                <div className="flex flex-col items-center w-full max-w-4xl animate-fade-in space-y-6">
+                    <div className="w-full flex justify-between items-center bg-white p-4 rounded-xl shadow-sm border border-gray-200">
+                        <button onClick={() => { stopMic(); setMode('menu'); }} className="text-gray-500 hover:text-gray-800 font-bold">← 離開</button>
+                        <div className="flex flex-col items-center">
+                            <div className="text-xl font-bold text-gray-800">{mode === 'training' ? '自由訓練模式' : `測驗中: 第 ${questionCount} / 5 題`}</div>
+                            <div className="font-mono text-xl font-bold text-amber-600">{mode === 'scoring' && `分數: ${totalScore}`}</div>
+                        </div>
+                        
+                        {/* 降噪控制區 (僅在麥克風開啟時顯示或持續顯示) */}
+                        <div className="flex items-center bg-gray-100 rounded-full px-3 py-1 border border-gray-300">
+                            <Sliders size={14} className="text-gray-500 mr-2" />
+                            <span className="text-xs text-gray-600 mr-2 whitespace-nowrap">降噪閾值</span>
+                            <input 
+                                type="range" min="0.001" max="0.2" step="0.001" 
+                                value={noiseThreshold}
+                                onChange={(e) => setNoiseThreshold(parseFloat(e.target.value))}
+                                className="w-16 h-1 bg-gray-300 rounded-lg appearance-none cursor-pointer accent-green-600"
+                                title={`閾值: ${noiseThreshold.toFixed(3)}`}
+                            />
+                        </div>
+                    </div>
+                    
+                    <div className="bg-white p-8 rounded-2xl shadow-lg border-2 border-amber-100 w-full text-center relative overflow-hidden">
+                        <div className="absolute top-0 left-0 w-full h-2 bg-amber-500"></div>
+                        <h3 className="text-gray-500 font-bold mb-2">目標音高 (Target Note)</h3>
+                        <div className="text-7xl font-black text-gray-800 mb-6 font-mono">{targetNote?.name} <span className="text-3xl text-gray-400 font-normal">({targetNote?.solfege})</span></div>
+                        <div className="flex justify-center gap-4 mb-8">
+                            <button 
+                                onClick={playTargetSound} 
+                                onMouseUp={() => audio.stopTone()} 
+                                onMouseLeave={() => audio.stopTone()} 
+                                className="flex items-center px-6 py-3 bg-amber-100 text-amber-800 rounded-full hover:bg-amber-200 transition-colors font-bold"
+                            >
+                                <Play size={20} className="mr-2" /> 聽聽看 (按住)
+                            </button>
+                            {!roundScore && (
+                                <button 
+                                    onClick={toggleMic} 
+                                    className={`flex items-center px-6 py-3 rounded-full font-bold transition-all ${isMicActive ? 'bg-red-500 text-white animate-pulse shadow-red-200 shadow-lg' : 'bg-gray-800 text-white hover:bg-gray-700'}`}
+                                >
+                                    {isMicActive ? <><MicOff size={20} className="mr-2"/> 停止偵測</> : <><Mic size={20} className="mr-2"/> 開始偵測</>}
+                                </button>
+                            )}
+                        </div>
+                        <div className="bg-gray-100 rounded-xl p-6 relative">
+                            {!roundScore ? (
+                                <>
+                                    <div className="flex justify-between items-end mb-2"><span className="text-sm text-gray-500">你的音高</span><span className={`text-xl font-bold ${feedbackColor}`}>{detectedPitch ? feedbackText : '等待聲音...'}</span></div>
+                                    <div className="h-4 w-full bg-gray-300 rounded-full relative overflow-hidden">
+                                        <div className="absolute left-1/2 top-0 h-full w-[2px] bg-black z-10 opacity-20"></div>
+                                        <div className="absolute left-1/2 top-0 h-full w-[6%] bg-green-400 -translate-x-1/2 opacity-50"></div>
+                                        {detectedPitch && (
+                                            <div 
+                                                className={`absolute top-0 h-full w-2 rounded-full transition-all duration-100 ${Math.abs(diffCents) <= 15 ? 'bg-green-600' : 'bg-red-500'}`}
+                                                style={{
+                                                    left: '50%',
+                                                    transform: `translateX(${Math.max(-150, Math.min(150, diffCents * 3))}px)`
+                                                }}
+                                            ></div>
+                                        )}
+                                    </div>
+                                    <div className="flex justify-between text-xs text-gray-400 mt-1">
+                                        <span>低 (Flat)</span>
+                                        <span>準 (Tune)</span>
+                                        <span>高 (Sharp)</span>
+                                    </div>
+                                    
+                                    {detectedPitch && (
+                                        <div className="mt-2 text-gray-500 font-mono">
+                                            Detected: {detectedInfo.name} ({Math.round(detectedPitch)}Hz) 
+                                            <span className="ml-2 text-xs bg-gray-200 px-2 py-1 rounded">誤差: {Math.round(diffCents)} cents</span>
+                                        </div>
+                                    )}
+                                </>
+                            ) : (
+                                <div className="text-center py-4">
+                                    <div className="text-lg font-bold text-gray-600 mb-1">本題得分</div>
+                                    <div className={`text-5xl font-black ${roundScore >= 15 ? 'text-green-600' : roundScore > 0 ? 'text-amber-500' : 'text-gray-400'}`}>
+                                        +{roundScore}
+                                    </div>
+                                    <p className="text-sm text-gray-400 mt-2">
+                                        {roundScore === 20 ? "太神啦！完美音準！" : roundScore >= 10 ? "不錯喔！很接近了！" : "再接再厲！"}
+                                    </p>
+                                </div>
+                            )}
+                        </div>
+                        <div className="mt-8">
+                            {mode === 'training' ? (
+                                <button onClick={nextQuestion} className="px-8 py-3 bg-white border-2 border-amber-500 text-amber-600 rounded-lg font-bold hover:bg-amber-50">換下一題練習</button>
+                            ) : (
+                                !roundScore ? (
+                                    <button 
+                                        onClick={submitAnswer} 
+                                        disabled={!detectedPitch}
+                                        className={`px-12 py-4 rounded-xl font-bold text-lg shadow-md transition-all ${
+                                            detectedPitch 
+                                            ? 'bg-blue-600 text-white hover:bg-blue-700 hover:scale-105' 
+                                            : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                                        }`}
+                                    >
+                                        鎖定答案 (Submit)
+                                    </button>
+                                ) : (
+                                    <button 
+                                        onClick={nextScoringLevel} 
+                                        className="px-12 py-4 bg-gray-800 text-white rounded-xl font-bold text-lg hover:bg-gray-700 hover:scale-105 shadow-md transition-all"
+                                    >
+                                        {questionCount < 5 ? '下一題' : '查看總成績'}
+                                    </button>
+                                )
+                            )}
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
+        // 6. 專業節拍器 (新增 6/8, 3/8, 9/8, 12/8, 2/2, 3/2, 4/2 拍)
+        const MetronomeSimulator = ({ audio }) => {
+            const [bpm, setBpm] = useState(60);
+            const [isPlaying, setIsPlaying] = useState(false);
+            // 使用物件儲存分子分母 { num: 4, den: 4 }
+            const [timeSignature, setTimeSignature] = useState({ num: 4, den: 4 }); 
+            const [currentBeat, setCurrentBeat] = useState(0);
+            const [soundType, setSoundType] = useState('standard'); 
+            const timerRef = useRef(null);
+            const beatCounterRef = useRef(0);
+
+            const toggleMetronome = () => {
+                if (isPlaying) {
+                    clearInterval(timerRef.current);
+                    setCurrentBeat(0);
+                    beatCounterRef.current = 0;
+                    setIsPlaying(false);
+                } else {
+                    setIsPlaying(true);
+                    const intervalMs = (60 / bpm) * 1000;
+                    // 由於拍號分母影響音符長度，通常 BPM 指的是四分音符
+                    // 如果分母是 8 (八分音符)，速度感會變快 (0.5倍時長)；分母是 2 (二分音符)，速度感變慢 (2倍時長)
+                    // 但為了使用者直覺，通常節拍器 BPM 指的是「一拍」的速度，無論那一拍是什麼音符。
+                    // 因此這裡維持 BPM = 一拍的速度。
+                    
+                    playTick(1);
+                    beatCounterRef.current = 1;
+                    
+                    timerRef.current = setInterval(() => {
+                        let nextBeat = beatCounterRef.current + 1;
+                        if (nextBeat > timeSignature.num) nextBeat = 1;
+                        beatCounterRef.current = nextBeat;
+                        playTick(nextBeat);
+                    }, intervalMs);
+                }
+            };
+
+            const playTick = (beatNumber) => {
+                setCurrentBeat(beatNumber);
+                
+                // 節奏邏輯：2=強拍(Strong/Kick), 1=次強拍(Medium/Snare), 0=弱拍(Weak/Hihat)
+                let strength = 0;
+                const { num, den } = timeSignature;
+
+                if (beatNumber === 1) {
+                    strength = 2; // 第一拍總是強拍
+                } else if (den === 8) {
+                    // 複拍子邏輯 (以3拍為一組)
+                    // 3/8: 1(S) 2(W) 3(W)
+                    // 6/8: 1(S) 2 3 4(M) 5 6
+                    // 9/8: 1(S) .. 4(M) .. 7(M) ..
+                    // 12/8: 1(S) .. 4(M) .. 7(M) .. 10(M) ..
+                    if ((beatNumber - 1) % 3 === 0) strength = 1; 
+                } else if (den === 2) {
+                    // 二分拍邏輯
+                    // 4/2: 1(S) 2(W) 3(M) 4(W) - 類似 4/4
+                    if (num === 4 && beatNumber === 3) strength = 1;
+                } else if (den === 4) {
+                    // 四分拍邏輯
+                    // 4/4: 1(S) 2(W) 3(M) 4(W)
+                    if (num === 4 && beatNumber === 3) strength = 1;
+                }
+                
+                audio.playClick(null, soundType, strength);
+            };
+
+            useEffect(() => {
+                if (isPlaying) {
+                    clearInterval(timerRef.current);
+                    const intervalMs = (60 / bpm) * 1000;
+                    timerRef.current = setInterval(() => {
+                        let nextBeat = beatCounterRef.current + 1;
+                        if (nextBeat > timeSignature.num) nextBeat = 1;
+                        beatCounterRef.current = nextBeat;
+                        playTick(nextBeat);
+                    }, intervalMs);
+                }
+            }, [bpm, timeSignature]); 
+
+            useEffect(() => {
+                return () => clearInterval(timerRef.current);
+            }, []);
+
+            // 拍號說明文字生成
+            const getTimeSigDescription = () => {
+                const { num, den } = timeSignature;
+                let desc = "";
+                
+                if (den === 8) {
+                    if (num === 3) desc = "3/8 拍子：單拍子，一小節 3 拍，以八分音符為一拍。";
+                    else if (num === 6) desc = "6/8 拍子：複拍子（二拍子特性），一小節 6 拍，分為 2 組 (3+3)。節奏感：強-弱-弱-次強-弱-弱。";
+                    else if (num === 9) desc = "9/8 拍子：複拍子（三拍子特性），一小節 9 拍，分為 3 組 (3+3+3)。";
+                    else if (num === 12) desc = "12/8 拍子：複拍子（四拍子特性），一小節 12 拍，分為 4 組 (3+3+3+3)。常用於藍調或慢搖滾。";
+                } else if (den === 2) {
+                    desc = `${num}/2 拍子：以二分音符為一拍。2/2 拍又稱「切分拍」(Cut Time)，常用於進行曲或快節奏樂曲。`;
+                } else {
+                    desc = `${num}/${den} 拍子：最常見的拍號形式。分子是 ${num}，代表一小節有 ${num} 拍；分母是 ${den}，代表以四分音符為一拍。`;
+                }
+                return desc;
+            };
+
+            return (
+                <div className="flex flex-col items-center w-full max-w-4xl animate-fade-in space-y-6">
+                    <div className="bg-indigo-50 p-6 rounded-xl shadow-lg border-2 border-indigo-200 w-full">
+                        <h2 className="text-2xl font-bold text-indigo-900 mb-6 flex items-center">
+                            <Clock className="mr-2" /> 專業節拍器
+                        </h2>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                            {/* 左側：控制面板 */}
+                            <div className="space-y-6">
+                                {/* BPM 控制 */}
+                                <div className="bg-white p-5 rounded-lg shadow-sm relative group">
+                                    <div className="absolute top-2 right-2 text-gray-300 hover:text-indigo-500 cursor-help">
+                                        <HelpCircle size={18} />
+                                    </div>
+                                    {/* BPM Tooltip */}
+                                    <div className="absolute top-8 right-2 bg-gray-800 text-white text-xs p-2 rounded w-48 hidden group-hover:block z-10 shadow-lg">
+                                        <b>BPM (Beats Per Minute)</b><br/>代表「每分鐘的拍數」。數值越大，歌曲速度越快；數值越小，速度越慢。例如 60 BPM 代表每秒鐘一拍。
+                                    </div>
+
+                                    <div className="flex justify-between items-center mb-4">
+                                        <span className="text-gray-500 font-bold">速度 (BPM)</span>
+                                        <span className="text-4xl font-black text-indigo-600 font-mono">{bpm}</span>
+                                    </div>
+                                    <input 
+                                        type="range" min="30" max="240" 
+                                        value={bpm} onChange={(e) => setBpm(Number(e.target.value))}
+                                        className="w-full h-3 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-indigo-600 mb-4"
+                                    />
+                                    <div className="flex justify-center gap-2">
+                                        <button onClick={() => setBpm(b => Math.max(30, b-1))} className="w-10 h-10 rounded-full bg-gray-100 hover:bg-gray-200 font-bold">-</button>
+                                        <button onClick={() => setBpm(b => Math.max(30, b-5))} className="px-3 py-2 rounded-lg bg-gray-100 hover:bg-gray-200 text-xs font-bold">-5</button>
+                                        <button onClick={() => setBpm(b => Math.min(240, b+5))} className="px-3 py-2 rounded-lg bg-gray-100 hover:bg-gray-200 text-xs font-bold">+5</button>
+                                        <button onClick={() => setBpm(b => Math.min(240, b+1))} className="w-10 h-10 rounded-full bg-gray-100 hover:bg-gray-200 font-bold">+</button>
+                                    </div>
+                                </div>
+
+                                {/* 拍號設定 */}
+                                <div className="bg-white p-5 rounded-lg shadow-sm">
+                                    <h3 className="text-gray-500 font-bold mb-3">拍號 (Time Signature)</h3>
+                                    
+                                    <div className="space-y-3">
+                                        {/* 四分音符基準 (常見) */}
+                                        <div className="flex gap-2 flex-wrap">
+                                            <span className="text-xs font-bold text-gray-300 w-full mb-1">四分音符 (Simple)</span>
+                                            {[2, 3, 4].map(num => (
+                                                <button 
+                                                    key={`4-${num}`}
+                                                    onClick={() => setTimeSignature({ num, den: 4 })}
+                                                    className={`flex-1 py-1.5 px-2 rounded font-bold border text-sm transition-all ${timeSignature.num === num && timeSignature.den === 4 ? 'bg-indigo-100 border-indigo-500 text-indigo-700' : 'bg-white border-gray-200 text-gray-500 hover:bg-gray-50'}`}
+                                                >
+                                                    {num}/4
+                                                </button>
+                                            ))}
+                                        </div>
+
+                                        {/* 八分音符基準 (複拍子) */}
+                                        <div className="flex gap-2 flex-wrap">
+                                            <span className="text-xs font-bold text-gray-300 w-full mb-1">八分音符 (Compound)</span>
+                                            {[3, 6, 9, 12].map(num => (
+                                                <button 
+                                                    key={`8-${num}`}
+                                                    onClick={() => setTimeSignature({ num, den: 8 })}
+                                                    className={`flex-1 py-1.5 px-2 rounded font-bold border text-sm transition-all ${timeSignature.num === num && timeSignature.den === 8 ? 'bg-indigo-100 border-indigo-500 text-indigo-700' : 'bg-white border-gray-200 text-gray-500 hover:bg-gray-50'}`}
+                                                >
+                                                    {num}/8
+                                                </button>
+                                            ))}
+                                        </div>
+
+                                        {/* 二分音符基準 */}
+                                        <div className="flex gap-2 flex-wrap">
+                                            <span className="text-xs font-bold text-gray-300 w-full mb-1">二分音符 (Half)</span>
+                                            {[2, 3, 4].map(num => (
+                                                <button 
+                                                    key={`2-${num}`}
+                                                    onClick={() => setTimeSignature({ num, den: 2 })}
+                                                    className={`flex-1 py-1.5 px-2 rounded font-bold border text-sm transition-all ${timeSignature.num === num && timeSignature.den === 2 ? 'bg-indigo-100 border-indigo-500 text-indigo-700' : 'bg-white border-gray-200 text-gray-500 hover:bg-gray-50'}`}
+                                                >
+                                                    {num}/2
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </div>
+
+                                    <div className="mt-4 p-3 bg-gray-50 rounded-lg text-xs text-gray-600 leading-relaxed border border-gray-100">
+                                        <b>定義：</b> {getTimeSigDescription()}
+                                    </div>
+                                </div>
+
+                                {/* 音色選擇 */}
+                                <div className="bg-white p-5 rounded-lg shadow-sm">
+                                    <h3 className="text-gray-500 font-bold mb-3">節拍音色</h3>
+                                    <div className="flex gap-2">
+                                        {[
+                                            {id: 'standard', name: '一般'},
+                                            {id: 'woodblock', name: '木魚'},
+                                            {id: 'drum', name: '鼓聲'}
+                                        ].map(type => (
+                                            <button 
+                                                key={type.id}
+                                                onClick={() => setSoundType(type.id)}
+                                                className={`flex-1 py-2 rounded-lg text-sm font-bold transition-all ${soundType === type.id ? 'bg-indigo-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
+                                            >
+                                                {type.name}
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* 右側：視覺化顯示 */}
+                            <div className="flex flex-col items-center justify-center space-y-8 bg-white p-8 rounded-xl shadow-inner border border-gray-100">
+                                {/* 視覺化燈號 */}
+                                <div className="flex gap-3 flex-wrap justify-center content-start min-h-[160px]">
+                                    {Array.from({ length: timeSignature.num }).map((_, idx) => {
+                                        const beatNum = idx + 1;
+                                        const isActive = currentBeat === beatNum;
+                                        // 視覺化強弱：1是紅燈(Strong)，複拍子的每組首拍是黃燈(Medium)，其他是藍燈
+                                        const isFirst = beatNum === 1;
+                                        let isMedium = false;
+                                        
+                                        if (timeSignature.den === 8) {
+                                            // 3/8, 6/8, 9/8, 12/8 每3拍一個重音
+                                            if ((beatNum - 1) % 3 === 0 && !isFirst) isMedium = true;
+                                        } else if (timeSignature.num === 4) {
+                                            // 4/4, 4/2 第三拍次強
+                                            if (beatNum === 3) isMedium = true;
+                                        }
+                                        
+                                        let activeClass = 'bg-indigo-500 shadow-indigo-200';
+                                        if (isFirst) activeClass = 'bg-red-500 shadow-red-200';
+                                        else if (isMedium) activeClass = 'bg-yellow-500 shadow-yellow-200';
+
+                                        // 根據拍數調整圓點大小
+                                        const sizeClass = timeSignature.num > 9 ? 'w-10 h-10 text-lg' : 'w-14 h-14 text-2xl';
+
+                                        return (
+                                            <div 
+                                                key={idx}
+                                                className={`
+                                                    ${sizeClass} rounded-full flex items-center justify-center font-black transition-all duration-75
+                                                    ${isActive 
+                                                        ? `${activeClass} text-white scale-110 shadow-lg` 
+                                                        : 'bg-gray-200 text-gray-400'
+                                                    }
+                                                `}
+                                            >
+                                                {beatNum}
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+
+                                {/* 播放按鈕 */}
+                                <button 
+                                    onClick={toggleMetronome}
+                                    className={`w-32 h-32 rounded-full flex items-center justify-center shadow-xl transition-all transform hover:scale-105 active:scale-95 ${
+                                        isPlaying 
+                                        ? 'bg-white border-4 border-indigo-500 text-indigo-500' 
+                                        : 'bg-indigo-500 text-white'
+                                    }`}
+                                >
+                                    {isPlaying ? (
+                                        <div className="w-8 h-8 bg-indigo-500 rounded-sm"></div> // Stop icon
+                                    ) : (
+                                        <Play size={48} className="ml-2" /> // Play icon
+                                    )}
+                                </button>
+                                
+                                <div className="text-gray-400 font-mono text-sm">
+                                    {isPlaying ? 'Running...' : 'Ready'}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
+        // --- 主應用程式 ---
+        const App = () => {
+          const [activeTab, setActiveTab] = useState('violin');
+          const [showHistory, setShowHistory] = useState(false);
+          const audio = useAudioEngine(); 
+
+          useEffect(() => { return () => { audio.stopTone(); }; }, [audio, activeTab]);
+
+          return (
+            <div className="min-h-screen bg-gray-50 font-sans text-gray-800 flex flex-col md:flex-row">
+              <aside className="w-full md:w-64 bg-white shadow-xl z-20 flex-shrink-0 flex flex-col md:h-screen md:sticky md:top-0">
+                <div className="p-6 border-b border-gray-100">
+                  <h1 className="font-extrabold tracking-tight flex flex-col"><span className="text-base text-gray-400 font-medium">聲音實驗室</span><span className="text-xl text-amber-600 mt-1">樂器與樂理實驗室</span></h1>
+                  <p className="text-xs text-gray-400 mt-3 leading-relaxed">探索樂器發聲的物理原理：張力、長度與頻率的關係</p>
+                </div>
+                <nav className="p-4 space-y-2 flex-1 overflow-y-auto">
+                  <div className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3 px-2">實驗項目</div>
+                  <button onClick={() => { setActiveTab('violin'); audio.stopTone(); }} className={`w-full text-left py-3 px-4 rounded-xl font-bold flex items-center transition-all duration-200 ${activeTab === 'violin' ? 'bg-amber-100 text-amber-900 shadow-sm ring-1 ring-amber-200' : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'}`}><div className={`p-2 rounded-lg mr-3 ${activeTab === 'violin' ? 'bg-amber-200' : 'bg-gray-100'}`}><Music size={18} /></div>弦樂器 (小提琴)</button>
+                  <button onClick={() => { setActiveTab('recorder'); audio.stopTone(); }} className={`w-full text-left py-3 px-4 rounded-xl font-bold flex items-center transition-all duration-200 ${activeTab === 'recorder' ? 'bg-sky-100 text-sky-900 shadow-sm ring-1 ring-sky-200' : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'}`}><div className={`p-2 rounded-lg mr-3 ${activeTab === 'recorder' ? 'bg-sky-200' : 'bg-gray-100'}`}><Wind size={18} /></div>管樂器 (直笛)</button>
+                  <button onClick={() => { setActiveTab('beat'); audio.stopTone(); }} className={`w-full text-left py-3 px-4 rounded-xl font-bold flex items-center transition-all duration-200 ${activeTab === 'beat' ? 'bg-purple-100 text-purple-900 shadow-sm ring-1 ring-purple-200' : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'}`}><div className={`p-2 rounded-lg mr-3 ${activeTab === 'beat' ? 'bg-purple-200' : 'bg-gray-100'}`}><Activity size={18} /></div>拍音實驗室 (Beats)</button>
+                  <button onClick={() => { setActiveTab('tuner'); audio.stopTone(); }} className={`w-full text-left py-3 px-4 rounded-xl font-bold flex items-center transition-all duration-200 ${activeTab === 'tuner' ? 'bg-yellow-100 text-yellow-900 shadow-sm ring-1 ring-yellow-200' : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'}`}><div className={`p-2 rounded-lg mr-3 ${activeTab === 'tuner' ? 'bg-yellow-200' : 'bg-gray-100'}`}><Piano size={18} /></div>調音大師 (Tuner)</button>
+                  <button onClick={() => { setActiveTab('pitchTrainer'); audio.stopTone(); }} className={`w-full text-left py-3 px-4 rounded-xl font-bold flex items-center transition-all duration-200 ${activeTab === 'pitchTrainer' ? 'bg-green-100 text-green-900 shadow-sm ring-1 ring-green-200' : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'}`}><div className={`p-2 rounded-lg mr-3 ${activeTab === 'pitchTrainer' ? 'bg-green-200' : 'bg-gray-100'}`}><GraduationCap size={18} /></div>音準教練 (Trainer)</button>
+                  <button onClick={() => { setActiveTab('metronome'); audio.stopTone(); }} className={`w-full text-left py-3 px-4 rounded-xl font-bold flex items-center transition-all duration-200 ${activeTab === 'metronome' ? 'bg-indigo-100 text-indigo-900 shadow-sm ring-1 ring-indigo-200' : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'}`}><div className={`p-2 rounded-lg mr-3 ${activeTab === 'metronome' ? 'bg-indigo-200' : 'bg-gray-100'}`}><Clock size={18} /></div>專業節拍器</button>
+                </nav>
+                <div className="p-4 border-t border-gray-100 text-center md:text-left">
+                    <div className="text-sm font-bold text-gray-600 mb-2">by 小萬</div>
+                    <button onClick={() => setShowHistory(true)} className="flex items-center text-xs text-gray-400 hover:text-gray-600 transition-colors mb-3">
+                        <History size={14} className="mr-1"/> v2.5.4 (點擊查看紀錄)
+                    </button>
+                    <a href="https://sites.google.com/view/cutedavid/" target="_blank" rel="noreferrer" className="inline-block w-full py-2 px-4 bg-gray-100 hover:bg-gray-200 text-gray-600 text-xs font-bold rounded-lg text-center transition-colors no-underline">
+                        返回萬老師實驗室
+                    </a>
+                </div>
+              </aside>
+              
+              <main className="flex-1 p-4 md:p-8 overflow-y-auto h-auto md:h-screen relative">
+                <div className="max-w-4xl mx-auto">
+                  {activeTab === 'violin' ? (<ViolinSimulator audio={audio} />) : activeTab === 'recorder' ? (<RecorderSimulator audio={audio} />) : activeTab === 'beat' ? (<BeatSimulator audio={audio} />) : activeTab === 'tuner' ? (<TunerMaster audio={audio} />) : activeTab === 'pitchTrainer' ? (<PitchTrainer audio={audio} />) : (<MetronomeSimulator audio={audio} />)}
+                </div>
+
+                {/* 版本紀錄 Modal */}
+                {showHistory && (
+                    <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
+                        <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[80vh] flex flex-col animate-fade-in">
+                            <div className="p-6 border-b border-gray-100 flex justify-between items-center bg-gray-50 rounded-t-2xl">
+                                <h3 className="text-xl font-bold text-gray-800 flex items-center"><History className="mr-2 text-amber-600"/> 版本更新紀錄</h3>
+                                <button onClick={() => setShowHistory(false)} className="p-2 hover:bg-gray-200 rounded-full transition-colors"><X size={20} className="text-gray-500"/></button>
+                            </div>
+                            <div className="p-6 overflow-y-auto flex-1 space-y-6">
+                                {VERSION_HISTORY.map((ver, idx) => (
+                                    <div key={idx} className="relative pl-6 border-l-2 border-amber-200 last:border-transparent pb-2">
+                                        <div className="absolute -left-[9px] top-0 w-4 h-4 bg-amber-400 rounded-full border-4 border-white shadow-sm"></div>
+                                        <div className="flex items-baseline mb-1">
+                                            <span className="font-bold text-lg text-gray-800 mr-2">v{ver.ver}</span>
+                                            <span className="text-xs text-gray-400">{ver.date}</span>
+                                        </div>
+                                        <p className="text-sm text-gray-600 leading-relaxed">{ver.content}</p>
+                                    </div>
+                                ))}
+                            </div>
+                            <div className="p-4 border-t border-gray-100 text-center">
+                                <button onClick={() => setShowHistory(false)} className="px-6 py-2 bg-gray-800 text-white rounded-lg hover:bg-gray-700 transition-colors text-sm font-bold">關閉</button>
+                            </div>
+                        </div>
+                    </div>
+                )}
+              </main>
+            </div>
+          );
+        };
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
